@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """CPU-only SmolVLA inference smoke test.
 
-Follows the Hugging Face lerobot/smolvla_base quick-start inference path.
+Fixed observation + fixed flow-matching noise (SMOKE_SEED) for reproducible
+actions across runs. Checks shape/finiteness/magnitude and run-to-run equality.
 Does not train. Does not use GPU.
 """
 
@@ -29,13 +30,17 @@ from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.policies.factory import make_pre_post_processors
 from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 from lerobot.configs.policies import PreTrainedConfig
-from lerobot.policies.common.flow_matching import sample_noise
 from lerobot.policies.common.vla_utils import make_att_2d_masks
 from lerobot.utils.constants import OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TOKENS
 
 MODEL_ID = "lerobot/smolvla_base"
 DATASET_ID = "lerobot/libero"
-OUT_PATH = Path("/root/workspace/smolvla-cpu/smoke_test_report.json")
+OUT_PATH = Path(__file__).resolve().parents[1] / "smoke_test_report.json"
+# Fixed seed for reproducible inputs + flow-matching noise across runs.
+SMOKE_SEED = 0
+FIXED_TASK = "Put lego brick into the transparent box"
+# Post-unnormalize action sanity bounds (SO-100-scale joint/gripper units).
+ACTION_ABS_MAX = 500.0
 
 
 def _now() -> float:
@@ -57,18 +62,66 @@ def _summarize_tensor(x):
     }
 
 
+def _make_generator(device: torch.device | str = "cpu") -> torch.Generator:
+    g = torch.Generator(device=device)
+    g.manual_seed(SMOKE_SEED)
+    return g
+
+
+def make_fixed_noise(shape: tuple[int, ...], device: torch.device | str) -> torch.Tensor:
+    """Deterministic N(0,1) flow-matching noise (same across runs)."""
+    return torch.normal(
+        mean=0.0,
+        std=1.0,
+        size=shape,
+        dtype=torch.float32,
+        device=device,
+        generator=_make_generator(device),
+    )
+
+
 def make_dummy_frame(config) -> dict:
+    """Fixed observation (not random). Same tensors every call / every process."""
+    # Explicit seed so any future stochastic helper stays aligned.
+    torch.manual_seed(SMOKE_SEED)
     frame = {
-        "observation.state": torch.zeros(6, dtype=torch.float32),
-        "task": "Put lego brick into the transparent box",
+        "observation.state": torch.tensor(
+            [0.0, 0.1, -0.1, 0.2, -0.2, 0.0], dtype=torch.float32
+        ),
+        "task": FIXED_TASK,
     }
     for key, feat in config.input_features.items():
         if key == "observation.state":
             continue
-        shape = tuple(feat.shape)
-        # Model card uses 3x256x256 visual features; values in [0, 1].
-        frame[key] = torch.rand(*shape, dtype=torch.float32)
+        c, h, w = tuple(feat.shape)
+        # Deterministic [0, 1] image: channel planes + spatial ramp (no torch.rand).
+        yy = torch.linspace(0.0, 1.0, h, dtype=torch.float32).view(1, h, 1)
+        xx = torch.linspace(0.0, 1.0, w, dtype=torch.float32).view(1, 1, w)
+        base = 0.25 + 0.5 * (0.5 * yy + 0.5 * xx)
+        chans = []
+        for ci in range(c):
+            chans.append(torch.clamp(base + 0.05 * (ci - 1), 0.0, 1.0))
+        frame[key] = torch.cat(chans, dim=0)
     return frame
+
+
+def assert_action_reasonable(action: torch.Tensor, *, label: str) -> dict:
+    """Shape / finiteness / magnitude checks for a postprocessed action."""
+    checks = {
+        "label": label,
+        "shape_ok": list(action.shape) == [1, 6],
+        "dtype_ok": action.dtype == torch.float32,
+        "finite_ok": bool(torch.isfinite(action).all()),
+        "not_all_zero": bool(action.abs().sum() > 0),
+        "abs_max": float(action.abs().max()),
+        "abs_max_ok": bool(action.abs().max() <= ACTION_ABS_MAX),
+    }
+    checks["ok"] = all(
+        checks[k] for k in ("shape_ok", "dtype_ok", "finite_ok", "not_all_zero", "abs_max_ok")
+    )
+    if not checks["ok"]:
+        raise AssertionError(f"unreasonable action ({label}): {checks} sample={_summarize_tensor(action)}")
+    return checks
 
 
 def try_libero_frame() -> tuple[dict | None, dict]:
@@ -177,7 +230,14 @@ def probe_real_world_cli() -> dict:
     return result
 
 
-def profile_stage_timings(policy: SmolVLAPolicy, batch: dict, postprocess, *, warmup: bool = True) -> dict:
+def profile_stage_timings(
+    policy: SmolVLAPolicy,
+    batch: dict,
+    postprocess,
+    *,
+    noise: torch.Tensor | None = None,
+    warmup: bool = True,
+) -> dict:
     """Wall-clock Stage 0-4 timings for one action-chunk fill on CPU.
 
     Stage boundaries follow SmolVLA_Operator_List.md / Architecture.md:
@@ -241,7 +301,10 @@ def profile_stage_timings(policy: SmolVLAPolicy, batch: dict, postprocess, *, wa
         bsize = state.shape[0]
         device = state.device
         actions_shape = (bsize, cfg.chunk_size, cfg.max_action_dim)
-        x_t = sample_noise(actions_shape, device)
+        if noise is None:
+            x_t = make_fixed_noise(actions_shape, device)
+        else:
+            x_t = noise.to(device=device, dtype=torch.float32).clone()
         dt = -1.0 / num_steps
         prefix_len = prefix_pad_masks.shape[1]
 
@@ -397,76 +460,84 @@ def main() -> int:
     )
     report["processors"] = {"seconds": round(_now() - t0, 2)}
 
-    print("\n[4/6] Load one real batch from lerobot/libero (official quick start)", flush=True)
-    if os.environ.get("SKIP_LIBERO", "1") == "1":
-        print("SKIP_LIBERO=1 — using dummy frame matching smolvla_base input_features (libero is ~1.9GB)", flush=True)
-        dataset_frame, dataset_meta = None, {"ok": False, "skipped": True, "reason": "SKIP_LIBERO=1; libero dataset is ~1.9GB and not required for CPU select_action"}
-    else:
-        dataset_frame, dataset_meta = try_libero_frame()
-    report["dataset"] = dataset_meta
-    source = "lerobot/libero"
-    if dataset_frame is None:
-        print(f"dataset load failed: {dataset_meta.get('error_type')} — using dummy frame matching model config", flush=True)
-        frame = make_dummy_frame(policy.config)
-        source = "dummy_matching_smolvla_base_config"
-    else:
-        frame = dataset_frame
-        print(f"dataset keys={dataset_meta.get('keys')}", flush=True)
+    print("\n[4/6] Build fixed model input (deterministic observation + noise)", flush=True)
+    # Always use the fixed dummy observation for reproducibility.
+    frame = make_dummy_frame(policy.config)
+    source = "fixed_dummy_smolvla_base"
+    report["dataset"] = {
+        "ok": False,
+        "skipped": True,
+        "reason": "using fixed deterministic dummy observation (SMOKE_SEED); libero not required",
+        "smoke_seed": SMOKE_SEED,
+        "task": FIXED_TASK,
+        "state": frame["observation.state"].tolist(),
+        "image_keys": sorted(k for k in frame if k.startswith("observation.images")),
+    }
+    print(json.dumps(report["dataset"], indent=2), flush=True)
 
-    print("\n[5/6] Run select_action on CPU", flush=True)
+    # Fixed flow-matching noise for select_action / profile (B, chunk, max_action_dim).
+    noise = make_fixed_noise(
+        (1, int(policy.config.chunk_size), int(policy.config.max_action_dim)),
+        device="cpu",
+    )
+
+    print("\n[5/6] Run select_action twice on CPU (fixed input + noise)", flush=True)
     t0 = _now()
-    inference_error = None
-    pred_summary = None
-    used_dummy_fallback = False
-    batch = None
-    try:
-        batch = preprocess(frame)
-        with torch.inference_mode():
-            # Official card calls select_action(frame); the policy API expects a
-            # preprocessed batch. Try official first, then the preprocessed batch.
-            try:
-                pred_action = policy.select_action(frame)
-            except Exception as official_exc:
-                print(f"select_action(frame) failed ({type(official_exc).__name__}); retrying with preprocessed batch", flush=True)
-                pred_action = policy.select_action(batch)
-            pred_action = postprocess(pred_action)
-        pred_summary = _summarize_tensor(pred_action)
-    except Exception as exc:
-        inference_error = f"{type(exc).__name__}: {exc}"
-        print(f"official/dataset path failed: {inference_error}", flush=True)
-        if source != "dummy_matching_smolvla_base_config":
-            used_dummy_fallback = True
-            policy.reset()
-            frame = make_dummy_frame(policy.config)
-            source = "dummy_matching_smolvla_base_config"
-            batch = preprocess(frame)
-            with torch.inference_mode():
-                pred_action = policy.select_action(batch)
-                pred_action = postprocess(pred_action)
-            pred_summary = _summarize_tensor(pred_action)
-            inference_error = None
-        else:
-            raise
+    batch = preprocess(frame)
+    reasonableness = []
+    with torch.inference_mode():
+        policy.reset()
+        pred1 = postprocess(policy.select_action(batch, noise=noise.clone()))
+        reasonableness.append(assert_action_reasonable(pred1, label="run1"))
 
+        policy.reset()
+        pred2 = postprocess(policy.select_action(batch, noise=noise.clone()))
+        reasonableness.append(assert_action_reasonable(pred2, label="run2"))
+
+    max_abs_diff = float((pred1 - pred2).abs().max())
+    identical = bool(torch.equal(pred1, pred2))
+    # Allow tiny float noise if backends ever differ; CPU eager should be exact.
+    deterministic_ok = identical or max_abs_diff <= 1e-6
+    if not deterministic_ok:
+        raise AssertionError(
+            f"non-deterministic actions across two runs: max_abs_diff={max_abs_diff} "
+            f"run1={pred1.tolist()} run2={pred2.tolist()}"
+        )
+
+    pred_summary = _summarize_tensor(pred1)
     report["inference"] = {
         "seconds": round(_now() - t0, 2),
         "batch_source": source,
-        "used_dummy_fallback": used_dummy_fallback,
+        "smoke_seed": SMOKE_SEED,
+        "fixed_noise": True,
         "action": pred_summary,
-        "first_attempt_error": inference_error,
+        "determinism": {
+            "runs": 2,
+            "identical": identical,
+            "max_abs_diff": max_abs_diff,
+            "ok": deterministic_ok,
+        },
+        "reasonableness": reasonableness,
     }
     print(json.dumps(report["inference"], indent=2), flush=True)
 
     print("\n[6/6] Profile Stage 0-4 wall-clock timings on CPU", flush=True)
     policy.reset()
-    if batch is None:
-        batch = preprocess(frame)
-    stage_profile = profile_stage_timings(policy, batch, postprocess, warmup=True)
+    stage_profile = profile_stage_timings(
+        policy, batch, postprocess, noise=noise.clone(), warmup=True
+    )
     report["stage_profile"] = stage_profile
     print(json.dumps(stage_profile, indent=2), flush=True)
 
     report["total_seconds"] = round(_now() - overall_t0, 2)
-    report["status"] = "PASS" if pred_summary and pred_summary.get("finite") else "FAIL"
+    report["status"] = (
+        "PASS"
+        if pred_summary
+        and pred_summary.get("finite")
+        and deterministic_ok
+        and all(r["ok"] for r in reasonableness)
+        else "FAIL"
+    )
     OUT_PATH.write_text(json.dumps(report, indent=2))
     print(f"\nSTATUS={report['status']} total_s={report['total_seconds']}", flush=True)
     print(f"Wrote {OUT_PATH}", flush=True)

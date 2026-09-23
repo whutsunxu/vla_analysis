@@ -528,6 +528,20 @@ Instrumented path mirrors `_get_action_chunk` / `sample_actions` with timers aro
 | **4** Crop / queue / post | crop to 6-D, queue, pop one, mean/std unnormalize | **~0.000** | **~0%** |
 | **Sum** | Stages 0–4 | **18.164** | 100% |
 
+#### Match to theoretical FLOP shares
+
+Measured wall-clock shares line up with the end-to-end Basic FLOP breakdown in `SmolVLA_Operator_List.md` §7.3 (~831.6B Basic total). Same stage order and similar magnitudes:
+
+| Stage | FLOP share (Basic) | Wall-clock share (CPU) | Reading |
+|---|---:|---:|---|
+| **0** Prefix / vision | **78.1%** | **70.9%** | Dominant in both; SigLIP/ViT is the bottleneck |
+| **3** Expert denoise | **13.6%** | **18.8%** | Second in both; CPU time a bit higher than FLOP share (KV/cache, Euler loop overhead) |
+| **2** Prefill | **8.1%** | **10.2%** | Third in both; close |
+| **1** Suffix embed | **0.2%** | **0.07%** | Negligible in both |
+| **4** Crop / queue / post | **≈0%** | **≈0%** | Negligible on this path (no robot I/O) |
+
+So the profile **fairly matches** the theoretical analysis: Stage 0 ≫ Stage 3 ≫ Stage 2 ≫ Stages 1/4. Absolute seconds depend on the host; use share % and this ordering for optimization targeting (framework / graph / IR work should hit Stage 0 first, then Stage 3).
+
 Derived:
 
 ```
@@ -540,7 +554,5 @@ select_action end-to-end (same machine/run)      ≈ 17.7 s
 
 Notes:
 
-- Stage 0 dominates wall time on CPU (~71%), consistent with it owning most FLOPs (vision encoder).
 - Stage 2 is a one-shot cost per chunk; Stages 1+3 together are ~3.43 s across 10 Euler steps.
-- Stage 4 is negligible next to the model path.
-- Absolute seconds vary with host load; use the **share %** and relative ordering for planning. Re-run: `python smoke_test_inference.py` (writes `stage_profile` into `smoke_test_report.json`).
+- Absolute seconds vary with host load; re-run: `python smoke_test_inference.py` (writes `stage_profile` into `smoke_test_report.json`).
