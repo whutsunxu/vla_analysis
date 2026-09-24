@@ -13,7 +13,7 @@
 | **Not** used for launch times | `cuda_gpu_kern_sum` CSV averages |
 | Measured chunk | 3rd inference after 2 warmups (`upsample` @ **540.4229 ms** rel. first CUPTI kernel) |
 
-**Reusable skill (how to rebuild this file for another inference path):** **§9**.
+**Key-ops utilization summary:** **§9**. **Reusable skill** (rebuild this file): **§10**.
 
 **Promise:** GPU times are CUPTI `(end-start)` from the `.nsys-rep` export. I/O columns come from matching ATen chrono ops in launch order when possible; otherwise inferred and tagged.
 
@@ -530,11 +530,71 @@ Launches **5**, busy Σ **9.44 µs**, window `669.0888→669.1395 ms`. ATen-matc
 
 ---
 
-## 9. Skill — produce a GPU kernel list for any inference path
+## 9. Summary — key ops utilization and perf potential
+
+Scope: **first-template** tables in this doc (§2–§8), not full-chunk × repeats. Metrics = measured CUPTI time vs §0.1 peaks (§0.2). **FLOPs util** and **BD util** are algorithmic; BD util ≥100% is tagged in the tables (`⚠…`) and is **not** real DRAM > peak.
+
+Peaks used: BF16 Tensor Core **94.8 TFLOP/s**, CUDA/FP32 **23.7 TFLOP/s**, DRAM **448 GB/s**.
+
+### 9.1 Snapshot table
+
+| Family | Where (examples) | Typical GPU time | FLOPs util | BD util | Theoretical bottleneck | Perf potential |
+|---|---|---:|---:|---:|---|---|
+| **Convolution** | §2 Patch Conv `#15` | **199 µs** (heaviest single launch in templates) | **~6.4%** TC | ~5% | **2D-calc-bounded** | Already compute-bound at low TC util — room via better conv algo / larger tiles / fused bias; bias is a separate Add today |
+| **Linear (ViT, large M)** | §3 Q/K/V/out, MLP up/down | 31–153 µs | **~33–42%** TC | ~18–31% | **2D-calc-bounded** | Best GEMM efficiency in this capture; further gains = epilogue fusion (bias/GELU/residual), QKV pack |
+| **Linear (prefill)** | §5 Q / attn-out / MLP | 11–41 µs | **~14–37%** TC | ~24–44% | **bd-bounded** | Memory-lean shapes (seq 241); fuse SiLU×mul into SwiGLU; pack QKV; expect util↑ if AI↑ (longer seq / fused) |
+| **Linear (expert even/odd)** | §6–§7 Q, attn-out, MLP, Cross-K/V | 7–16 µs | **~10–15%** (BF16 TC or FP32 CUDA) | ~15–70% | **bd-bounded** | Short seq **50** → bandwidth-bound; Cross-K/V **FP32 SIMT** (~13% of 23.7) especially weak vs bf16 TC — cast+TC or fused cross-attn |
+| **Linear (Stage 1 fusion)** | §4 mid/out FP32 | 23–39 µs | **~9–11%** CUDA | ~23–26% | **bd-bounded** | Small FP32 GEMMs; fuse SiLU; consider bf16 TC path if numerically OK |
+| **MatMul (eager attn)** | §5/§6/§7 `QKᵀ`, `A·V` | 7–21 µs | **~4–22%** | ~35–62% | **bd-bounded** | Unfused magma/CUTLASS/SIMT; replace with **SDPA/Flash** (see ViT); odd `A·V` stays FP32 (~10% CUDA) |
+| **Attention (fused)** | §3 FlashAttention `#5` | **83 µs** | **~42%** TC | ~17% | **2D-calc-bounded** | Reference pattern for Stage 2/3 — highest “attention” compute efficiency here |
+| **Softmax** | §5/§6/§7 standalone | 2–6 µs | **~1.7–2.9%** CUDA | ⚠ **138–247%** | **bd-bounded** | Tiny vs GEMMs; BD util nonsense (L2/algo-IO). Win = **fuse into Flash/SDPA** (eliminate launch), not micro-optimizing softmax |
+| **RMSNorm** | §5–§7 many tiny kernels | ~0.8–3 µs each (chain Σ small) | **≪1%** | often high / ⚠ | **bd-bounded** | Unfused `pow/mean/add/rsqrt/mul/cast` — fuse to one `rms_norm` kernel (ViT already uses fused **LayerNorm**) |
+| **LayerNorm** | §3 ViT `#1`,`#9` | **8.2 µs** ×2 | **~2.8%** CUDA | ~86% | **bd-bounded** | Already **one** fused kernel; low FLOPs util is expected (norm is memory-ish). Little upside beyond staying fused |
+
+### 9.2 Family notes
+
+#### Convolution
+Single Patch Conv dominates Stage‑0 prepare time among templates (**~199 µs**, AI≈279 → 2D-calc-bounded) but only **~6%** of BF16 TC peak — large theoretical headroom if the implementation or autotuning improves; not a DRAM story.
+
+#### Linear
+Clear **size / AI split**:
+- **ViT** (M=1024): 2D-calc-bounded, **~40%** TC util — healthiest Linears.
+- **Prefill / expert** (M=241 or 50): bd-bounded, **~10–37%** TC — weight traffic dominates.
+- **Expert Cross-K/V**: FP32 `simt_sgemm` on prefix 241, **~13%** of CUDA peak and **~15 µs** each — top odd-layer hotspots; prefer bf16 TC or fuse into cross-attn.
+
+#### MatMul vs fused attention
+Eager `QKᵀ`/`A·V` (+ `where` + Softmax) are **bd-bounded** at **~4–22%** FLOPs util. ViT **Flash** is **2D-calc-bounded** at **~42%** TC util. Largest Stage‑2/3 win: **eager → SDPA/Flash** (also drops Softmax/where launches).
+
+#### Softmax
+FLOPs util negligible; BD util >100% = algo-IO / L2 (§0.2 ⚠). Treat as fusion fodder, not a bandwidth-tuning target.
+
+#### RMSNorm vs LayerNorm
+RMSNorm = many launches, ≪1% FLOPs util, often ⚠ BD. LayerNorm = fused, still bd-bounded at ~3% FLOPs / ~86% BD model. Prefer **one fused RMSNorm** matching the ViT LN pattern.
+
+### 9.3 Priority reading (perf potential)
+
+| Priority | Action | Why (from this capture) |
+|---|---|---|
+| **P0** | Stage 2/3 eager attn → Flash/SDPA | Flash already **~42%** TC & 2D-bound; eager matmul/softmax are bd-bound & fragmented |
+| **P0** | Fuse RMSNorm chains | Dozens of sub‑µs–few‑µs launches; ViT LN shows fused is available |
+| **P1** | Expert Cross-K/V off FP32 SIMT | ~15 µs ×2 / odd layer at ~13% CUDA; odd `A·V` FP32 similar |
+| **P1** | SwiGLU / residual epilogues on MLP Linears | Prefill/expert MLP already mid util but still bd-bound + separate SiLU/mul |
+| **P2** | Patch Conv algorithm / fusion | Longest single template launch but only ~6% TC — worth tuning if Stage 0 wall matters |
+| **P2** | Pack QKV Linears | Three similar GEMMs per layer (ViT/prefill/expert) |
+
+### 9.4 How to read util here
+
+- **High FLOPs util + 2D-calc-bounded** (ViT Linear / Flash) → compute-limited; optimize algo / fusion / occupancy.
+- **Low–mid FLOPs util + bd-bounded** (expert Linear, eager matmul) → feed more math per byte (fuse, longer effective K, fewer launches) or cut traffic.
+- **BD util ≥100%** on Softmax/RMS/cast → **ignore as DRAM util**; fix the IO model or fuse — see ⚠ tags in tables.
+
+---
+
+## 10. Skill — produce a GPU kernel list for any inference path
 
 This section is the **playbook** used to build *this* file (`smolVLA_kerne_list_gpu_backend.md`). Pair it with the AtenOp skill (`SmolVLA_AtenOp_List_gpu_backend.md` **§7**): ATen chrono = *what PyTorch called*; this doc = *what the GPU ran*, with per-launch times and roofline metrics.
 
-### 9.1 Goal and deliverables
+### 10.1 Goal and deliverables
 
 | Deliverable | Content |
 |---|---|
@@ -546,14 +606,14 @@ This section is the **playbook** used to build *this* file (`smolVLA_kerne_list_
 **In scope:** CUPTI kernel launches in order; algorithmic IO/FLOPs; measured util vs peaks.  
 **Out of scope:** replacing ATen chrono (build that first or in parallel); using CSV `cuda_gpu_kern_sum` averages as per-launch times.
 
-### 9.2 Prerequisites
+### 10.2 Prerequisites
 
 1. **AtenOp inventory** (recommended) — same stages/templates as `*_AtenOp_List_gpu_backend.md` / `*_aten_chrono.json` for shape/dtype matching.
 2. **Nsight Systems** on the target machine (this capture: **2025.1.3**).
 3. **Eager CUDA inference** target that can run between `cudaProfilerStart` / `Stop` (this repo: `src/smolvla_nsight_target.py`).
 4. **GPU peak sheet** for §0.1-style table (SM count, DRAM GB/s, BF16 TC / FP32 CUDA peaks at boost).
 
-### 9.3 Step-by-step (SmolVLA → generalize)
+### 10.3 Step-by-step (SmolVLA → generalize)
 
 #### Step 1 — Capture one steady-state chunk with Nsight
 
@@ -670,11 +730,11 @@ Document structure (this file’s layout):
 1. §0 Source + platform peaks + metric definitions  
 2. §1 Stage durations (full chunk)  
 3. §2… kernel tables for each **first** template  
-4. §9 this skill  
+4. §10 this skill  
 
 Check in / publish: `.nsys-rep`, sqlite (or export recipe), kernel-list md, link to AtenOp list + chrono JSON.
 
-### 9.4 Checklist for a new inference case
+### 10.4 Checklist for a new inference case
 
 - [ ] AtenOp stages/templates available (or build in parallel per AtenOp §7)  
 - [ ] Nsight profile with warmup outside `cudaProfilerStart/Stop`  
@@ -688,7 +748,7 @@ Check in / publish: `.nsys-rep`, sqlite (or export recipe), kernel-list md, link
 - [ ] Platform peaks documented for *this* GPU  
 - [ ] Full demangled kernel strings retained  
 
-### 9.5 What to copy vs rewrite
+### 10.5 What to copy vs rewrite
 
 | Keep as-is (skill) | Rewrite per model / GPU |
 |---|---|
@@ -697,7 +757,7 @@ Check in / publish: `.nsys-rep`, sqlite (or export recipe), kernel-list md, link
 | `*[no aten]*` / `[dtype≠aten]` / ⚠ BD tags | Peak TFLOP/s and DRAM GB/s (§0.1) |
 | Pair with Aten chrono for I/O | Aten shapes, even/odd (or other) fingerprints |
 
-### 9.6 Minimal adapter sketch (other model)
+### 10.6 Minimal adapter sketch (other model)
 
 ```text
 1) nsys profile --capture-range=cudaProfilerApi -- your_infer_target.py
