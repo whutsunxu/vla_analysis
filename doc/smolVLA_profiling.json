@@ -1,0 +1,2148 @@
+{
+  "generated_at_utc": "2026-09-23T11:47:45.007201+00:00",
+  "model_id": "lerobot/smolvla_base",
+  "smoke_seed": 0,
+  "fixed_task": "Put lego brick into the transparent box",
+  "num_warmup": 2,
+  "num_runs": 5,
+  "environment": {
+    "hostname": "a8b9265fc194",
+    "python": "3.12.14",
+    "torch": "2.11.0+cu128",
+    "cuda_available": true,
+    "smoke_device_req": "cuda",
+    "device": "cuda",
+    "cuda": {
+      "device_name": "NVIDIA GeForce RTX 5060 Ti",
+      "capability": [
+        12,
+        0
+      ],
+      "torch_cuda": "12.8",
+      "memory_gb": 16.62,
+      "multi_processor_count": 36
+    }
+  },
+  "model": {
+    "param_count": 450046176,
+    "trainable_param_count": 99880992,
+    "by_dtype": {
+      "torch.bfloat16": {
+        "params": 446772624,
+        "bytes": 893545248,
+        "mb": 893.55
+      },
+      "torch.float32": {
+        "params": 3273552,
+        "bytes": 13094208,
+        "mb": 13.09
+      }
+    },
+    "by_device": {
+      "cuda:0": {
+        "params": 450046176,
+        "bytes": 906639456,
+        "mb": 906.64
+      }
+    },
+    "weight_mb_approx": 906.64,
+    "load_seconds": 6.39,
+    "chunk_size": 50,
+    "n_action_steps": 50,
+    "num_steps": 10,
+    "max_action_dim": 32,
+    "input_features": {
+      "observation.state": [
+        6
+      ],
+      "observation.images.camera1": [
+        3,
+        256,
+        256
+      ],
+      "observation.images.camera2": [
+        3,
+        256,
+        256
+      ],
+      "observation.images.camera3": [
+        3,
+        256,
+        256
+      ]
+    },
+    "output_features": {
+      "action": [
+        6
+      ]
+    }
+  },
+  "shapes": {
+    "images": [
+      [
+        1,
+        3,
+        512,
+        512
+      ],
+      [
+        1,
+        3,
+        512,
+        512
+      ],
+      [
+        1,
+        3,
+        512,
+        512
+      ]
+    ],
+    "img_masks": [
+      [
+        1
+      ],
+      [
+        1
+      ],
+      [
+        1
+      ]
+    ],
+    "state": [
+      1,
+      32
+    ],
+    "lang_tokens": [
+      1,
+      48
+    ],
+    "lang_masks": [
+      1,
+      48
+    ],
+    "prefix_embs": [
+      1,
+      241,
+      960
+    ],
+    "prefix_pad_masks": [
+      1,
+      241
+    ],
+    "prefix_att_masks": [
+      1,
+      241
+    ],
+    "prefix_embs_dtype": "torch.float32",
+    "prefix_att_2d_masks": [
+      1,
+      241,
+      241
+    ],
+    "prefix_position_ids": [
+      1,
+      241
+    ],
+    "use_cache": true,
+    "suffix_embs": [
+      1,
+      50,
+      720
+    ],
+    "suffix_pad_masks": [
+      1,
+      50
+    ],
+    "full_att_2d_masks": [
+      1,
+      50,
+      291
+    ],
+    "v_t": [
+      1,
+      50,
+      32
+    ],
+    "x_t": [
+      1,
+      50,
+      32
+    ],
+    "suffix_embs_dtype": "torch.float32",
+    "v_t_dtype": "torch.float32",
+    "action_chunk": [
+      1,
+      50,
+      6
+    ],
+    "action_step": [
+      1,
+      6
+    ]
+  },
+  "runs": [
+    {
+      "num_euler_steps": 10,
+      "euler_steps": [
+        {
+          "step": 0,
+          "flow_time": 1.0,
+          "stage1_suffix_embed_s": 0.000212,
+          "stage3_expert_denoise_s": 0.005835,
+          "stage3_euler_update_s": 1.7e-05,
+          "stage3_total_s": 0.005852,
+          "euler_step_total_s": 0.006064
+        },
+        {
+          "step": 1,
+          "flow_time": 0.9,
+          "stage1_suffix_embed_s": 0.000194,
+          "stage3_expert_denoise_s": 0.005725,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005736,
+          "euler_step_total_s": 0.00593
+        },
+        {
+          "step": 2,
+          "flow_time": 0.8,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005736,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005748,
+          "euler_step_total_s": 0.00594
+        },
+        {
+          "step": 3,
+          "flow_time": 0.7,
+          "stage1_suffix_embed_s": 0.000194,
+          "stage3_expert_denoise_s": 0.005668,
+          "stage3_euler_update_s": 1.7e-05,
+          "stage3_total_s": 0.005685,
+          "euler_step_total_s": 0.005879
+        },
+        {
+          "step": 4,
+          "flow_time": 0.6,
+          "stage1_suffix_embed_s": 0.000187,
+          "stage3_expert_denoise_s": 0.00571,
+          "stage3_euler_update_s": 1.7e-05,
+          "stage3_total_s": 0.005727,
+          "euler_step_total_s": 0.005914
+        },
+        {
+          "step": 5,
+          "flow_time": 0.5,
+          "stage1_suffix_embed_s": 0.000189,
+          "stage3_expert_denoise_s": 0.005684,
+          "stage3_euler_update_s": 1.6e-05,
+          "stage3_total_s": 0.005701,
+          "euler_step_total_s": 0.005889
+        },
+        {
+          "step": 6,
+          "flow_time": 0.4,
+          "stage1_suffix_embed_s": 0.00019,
+          "stage3_expert_denoise_s": 0.005681,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005692,
+          "euler_step_total_s": 0.005882
+        },
+        {
+          "step": 7,
+          "flow_time": 0.3,
+          "stage1_suffix_embed_s": 0.000185,
+          "stage3_expert_denoise_s": 0.005685,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005696,
+          "euler_step_total_s": 0.005882
+        },
+        {
+          "step": 8,
+          "flow_time": 0.2,
+          "stage1_suffix_embed_s": 0.000186,
+          "stage3_expert_denoise_s": 0.005705,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005717,
+          "euler_step_total_s": 0.005903
+        },
+        {
+          "step": 9,
+          "flow_time": 0.1,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005675,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005686,
+          "euler_step_total_s": 0.005874
+        }
+      ],
+      "shapes": {
+        "images": [
+          [
+            1,
+            3,
+            512,
+            512
+          ],
+          [
+            1,
+            3,
+            512,
+            512
+          ],
+          [
+            1,
+            3,
+            512,
+            512
+          ]
+        ],
+        "img_masks": [
+          [
+            1
+          ],
+          [
+            1
+          ],
+          [
+            1
+          ]
+        ],
+        "state": [
+          1,
+          32
+        ],
+        "lang_tokens": [
+          1,
+          48
+        ],
+        "lang_masks": [
+          1,
+          48
+        ],
+        "prefix_embs": [
+          1,
+          241,
+          960
+        ],
+        "prefix_pad_masks": [
+          1,
+          241
+        ],
+        "prefix_att_masks": [
+          1,
+          241
+        ],
+        "prefix_embs_dtype": "torch.float32",
+        "prefix_att_2d_masks": [
+          1,
+          241,
+          241
+        ],
+        "prefix_position_ids": [
+          1,
+          241
+        ],
+        "use_cache": true,
+        "suffix_embs": [
+          1,
+          50,
+          720
+        ],
+        "suffix_pad_masks": [
+          1,
+          50
+        ],
+        "full_att_2d_masks": [
+          1,
+          50,
+          291
+        ],
+        "v_t": [
+          1,
+          50,
+          32
+        ],
+        "x_t": [
+          1,
+          50,
+          32
+        ],
+        "suffix_embs_dtype": "torch.float32",
+        "v_t_dtype": "torch.float32",
+        "action_chunk": [
+          1,
+          50,
+          6
+        ],
+        "action_step": [
+          1,
+          6
+        ]
+      },
+      "memory": {
+        "after_stage0": {
+          "allocated_mb": 948.54,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 969.09,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_stage2": {
+          "allocated_mb": 954.01,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_euler_loop": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "start": {
+          "allocated_mb": 938.17,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 938.17,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "end": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        }
+      },
+      "stage0_prefix_embed_s": 0.023987,
+      "stage2_prefill_s": 0.00719,
+      "stage1_suffix_embed_s": 0.001917,
+      "stage3_expert_denoise_s": 0.057104,
+      "stage3_euler_update_s": 0.000136,
+      "stage3_expert_plus_euler_s": 0.057241,
+      "stage3_inclusive_with_stage1_s": 0.059158,
+      "stage4_crop_queue_postprocess_s": 5.2e-05,
+      "stages_0_to_4_sum_s": 0.090387,
+      "wall_clock_total_s": 0.091347,
+      "action": {
+        "shape": [
+          1,
+          6
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "min": -0.39810889959335327,
+        "max": 0.19139112532138824,
+        "mean": -0.09570863842964172,
+        "finite": true,
+        "sample": [
+          -0.06281795352697372,
+          -0.02878165990114212,
+          -0.1933826208114624,
+          0.19139112532138824,
+          -0.08255180716514587,
+          -0.39810889959335327
+        ]
+      },
+      "share_pct": {
+        "stage0": 26.54,
+        "stage1": 2.12,
+        "stage2": 7.95,
+        "stage3_expert": 63.33,
+        "stage4": 0.06
+      }
+    },
+    {
+      "num_euler_steps": 10,
+      "euler_steps": [
+        {
+          "step": 0,
+          "flow_time": 1.0,
+          "stage1_suffix_embed_s": 0.000208,
+          "stage3_expert_denoise_s": 0.005834,
+          "stage3_euler_update_s": 1.7e-05,
+          "stage3_total_s": 0.005851,
+          "euler_step_total_s": 0.006059
+        },
+        {
+          "step": 1,
+          "flow_time": 0.9,
+          "stage1_suffix_embed_s": 0.000189,
+          "stage3_expert_denoise_s": 0.005713,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005724,
+          "euler_step_total_s": 0.005914
+        },
+        {
+          "step": 2,
+          "flow_time": 0.8,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005682,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005693,
+          "euler_step_total_s": 0.00588
+        },
+        {
+          "step": 3,
+          "flow_time": 0.7,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005655,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005666,
+          "euler_step_total_s": 0.005854
+        },
+        {
+          "step": 4,
+          "flow_time": 0.6,
+          "stage1_suffix_embed_s": 0.000186,
+          "stage3_expert_denoise_s": 0.005635,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005646,
+          "euler_step_total_s": 0.005833
+        },
+        {
+          "step": 5,
+          "flow_time": 0.5,
+          "stage1_suffix_embed_s": 0.00019,
+          "stage3_expert_denoise_s": 0.005742,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005754,
+          "euler_step_total_s": 0.005944
+        },
+        {
+          "step": 6,
+          "flow_time": 0.4,
+          "stage1_suffix_embed_s": 0.000191,
+          "stage3_expert_denoise_s": 0.00569,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005701,
+          "euler_step_total_s": 0.005892
+        },
+        {
+          "step": 7,
+          "flow_time": 0.3,
+          "stage1_suffix_embed_s": 0.000194,
+          "stage3_expert_denoise_s": 0.005648,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005659,
+          "euler_step_total_s": 0.005854
+        },
+        {
+          "step": 8,
+          "flow_time": 0.2,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005626,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005637,
+          "euler_step_total_s": 0.005829
+        },
+        {
+          "step": 9,
+          "flow_time": 0.1,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005702,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005713,
+          "euler_step_total_s": 0.005905
+        }
+      ],
+      "shapes": {},
+      "memory": {
+        "after_stage0": {
+          "allocated_mb": 948.54,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 969.09,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_stage2": {
+          "allocated_mb": 954.01,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_euler_loop": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "start": {
+          "allocated_mb": 938.17,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 938.17,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "end": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        }
+      },
+      "stage0_prefix_embed_s": 0.023852,
+      "stage2_prefill_s": 0.007172,
+      "stage1_suffix_embed_s": 0.001919,
+      "stage3_expert_denoise_s": 0.056927,
+      "stage3_euler_update_s": 0.000118,
+      "stage3_expert_plus_euler_s": 0.057045,
+      "stage3_inclusive_with_stage1_s": 0.058964,
+      "stage4_crop_queue_postprocess_s": 5.2e-05,
+      "stages_0_to_4_sum_s": 0.090039,
+      "wall_clock_total_s": 0.091123,
+      "action": {
+        "shape": [
+          1,
+          6
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "min": -0.39810889959335327,
+        "max": 0.19139112532138824,
+        "mean": -0.09570863842964172,
+        "finite": true,
+        "sample": [
+          -0.06281795352697372,
+          -0.02878165990114212,
+          -0.1933826208114624,
+          0.19139112532138824,
+          -0.08255180716514587,
+          -0.39810889959335327
+        ]
+      },
+      "share_pct": {
+        "stage0": 26.49,
+        "stage1": 2.13,
+        "stage2": 7.96,
+        "stage3_expert": 63.36,
+        "stage4": 0.06
+      }
+    },
+    {
+      "num_euler_steps": 10,
+      "euler_steps": [
+        {
+          "step": 0,
+          "flow_time": 1.0,
+          "stage1_suffix_embed_s": 0.000213,
+          "stage3_expert_denoise_s": 0.005804,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005815,
+          "euler_step_total_s": 0.006028
+        },
+        {
+          "step": 1,
+          "flow_time": 0.9,
+          "stage1_suffix_embed_s": 0.000198,
+          "stage3_expert_denoise_s": 0.005769,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005782,
+          "euler_step_total_s": 0.005979
+        },
+        {
+          "step": 2,
+          "flow_time": 0.8,
+          "stage1_suffix_embed_s": 0.000197,
+          "stage3_expert_denoise_s": 0.005677,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005688,
+          "euler_step_total_s": 0.005885
+        },
+        {
+          "step": 3,
+          "flow_time": 0.7,
+          "stage1_suffix_embed_s": 0.00019,
+          "stage3_expert_denoise_s": 0.00566,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005671,
+          "euler_step_total_s": 0.00586
+        },
+        {
+          "step": 4,
+          "flow_time": 0.6,
+          "stage1_suffix_embed_s": 0.000191,
+          "stage3_expert_denoise_s": 0.005679,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.00569,
+          "euler_step_total_s": 0.005881
+        },
+        {
+          "step": 5,
+          "flow_time": 0.5,
+          "stage1_suffix_embed_s": 0.000191,
+          "stage3_expert_denoise_s": 0.00568,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005692,
+          "euler_step_total_s": 0.005883
+        },
+        {
+          "step": 6,
+          "flow_time": 0.4,
+          "stage1_suffix_embed_s": 0.000204,
+          "stage3_expert_denoise_s": 0.005677,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005688,
+          "euler_step_total_s": 0.005892
+        },
+        {
+          "step": 7,
+          "flow_time": 0.3,
+          "stage1_suffix_embed_s": 0.000187,
+          "stage3_expert_denoise_s": 0.005663,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005675,
+          "euler_step_total_s": 0.005862
+        },
+        {
+          "step": 8,
+          "flow_time": 0.2,
+          "stage1_suffix_embed_s": 0.000187,
+          "stage3_expert_denoise_s": 0.005657,
+          "stage3_euler_update_s": 1.6e-05,
+          "stage3_total_s": 0.005673,
+          "euler_step_total_s": 0.00586
+        },
+        {
+          "step": 9,
+          "flow_time": 0.1,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005651,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005663,
+          "euler_step_total_s": 0.005851
+        }
+      ],
+      "shapes": {},
+      "memory": {
+        "after_stage0": {
+          "allocated_mb": 948.54,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 969.09,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_stage2": {
+          "allocated_mb": 954.01,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_euler_loop": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "start": {
+          "allocated_mb": 938.17,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 938.17,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "end": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        }
+      },
+      "stage0_prefix_embed_s": 0.023857,
+      "stage2_prefill_s": 0.00719,
+      "stage1_suffix_embed_s": 0.001946,
+      "stage3_expert_denoise_s": 0.056917,
+      "stage3_euler_update_s": 0.00012,
+      "stage3_expert_plus_euler_s": 0.057037,
+      "stage3_inclusive_with_stage1_s": 0.058983,
+      "stage4_crop_queue_postprocess_s": 5.3e-05,
+      "stages_0_to_4_sum_s": 0.090083,
+      "wall_clock_total_s": 0.09117,
+      "action": {
+        "shape": [
+          1,
+          6
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "min": -0.39810889959335327,
+        "max": 0.19139112532138824,
+        "mean": -0.09570863842964172,
+        "finite": true,
+        "sample": [
+          -0.06281795352697372,
+          -0.02878165990114212,
+          -0.1933826208114624,
+          0.19139112532138824,
+          -0.08255180716514587,
+          -0.39810889959335327
+        ]
+      },
+      "share_pct": {
+        "stage0": 26.48,
+        "stage1": 2.16,
+        "stage2": 7.98,
+        "stage3_expert": 63.32,
+        "stage4": 0.06
+      }
+    },
+    {
+      "num_euler_steps": 10,
+      "euler_steps": [
+        {
+          "step": 0,
+          "flow_time": 1.0,
+          "stage1_suffix_embed_s": 0.000208,
+          "stage3_expert_denoise_s": 0.005836,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005848,
+          "euler_step_total_s": 0.006056
+        },
+        {
+          "step": 1,
+          "flow_time": 0.9,
+          "stage1_suffix_embed_s": 0.000189,
+          "stage3_expert_denoise_s": 0.005733,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005744,
+          "euler_step_total_s": 0.005933
+        },
+        {
+          "step": 2,
+          "flow_time": 0.8,
+          "stage1_suffix_embed_s": 0.000194,
+          "stage3_expert_denoise_s": 0.005755,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005766,
+          "euler_step_total_s": 0.00596
+        },
+        {
+          "step": 3,
+          "flow_time": 0.7,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005739,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.00575,
+          "euler_step_total_s": 0.005939
+        },
+        {
+          "step": 4,
+          "flow_time": 0.6,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005716,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005728,
+          "euler_step_total_s": 0.00592
+        },
+        {
+          "step": 5,
+          "flow_time": 0.5,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005683,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005694,
+          "euler_step_total_s": 0.005887
+        },
+        {
+          "step": 6,
+          "flow_time": 0.4,
+          "stage1_suffix_embed_s": 0.000186,
+          "stage3_expert_denoise_s": 0.005688,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005699,
+          "euler_step_total_s": 0.005886
+        },
+        {
+          "step": 7,
+          "flow_time": 0.3,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005697,
+          "stage3_euler_update_s": 1.5e-05,
+          "stage3_total_s": 0.005712,
+          "euler_step_total_s": 0.005904
+        },
+        {
+          "step": 8,
+          "flow_time": 0.2,
+          "stage1_suffix_embed_s": 0.000192,
+          "stage3_expert_denoise_s": 0.005663,
+          "stage3_euler_update_s": 1.6e-05,
+          "stage3_total_s": 0.005679,
+          "euler_step_total_s": 0.005871
+        },
+        {
+          "step": 9,
+          "flow_time": 0.1,
+          "stage1_suffix_embed_s": 0.000186,
+          "stage3_expert_denoise_s": 0.005675,
+          "stage3_euler_update_s": 1.4e-05,
+          "stage3_total_s": 0.005689,
+          "euler_step_total_s": 0.005876
+        }
+      ],
+      "shapes": {},
+      "memory": {
+        "after_stage0": {
+          "allocated_mb": 948.54,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 969.09,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_stage2": {
+          "allocated_mb": 954.01,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_euler_loop": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "start": {
+          "allocated_mb": 938.17,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 938.17,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "end": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        }
+      },
+      "stage0_prefix_embed_s": 0.023855,
+      "stage2_prefill_s": 0.007183,
+      "stage1_suffix_embed_s": 0.001921,
+      "stage3_expert_denoise_s": 0.057184,
+      "stage3_euler_update_s": 0.000125,
+      "stage3_expert_plus_euler_s": 0.05731,
+      "stage3_inclusive_with_stage1_s": 0.05923,
+      "stage4_crop_queue_postprocess_s": 5.2e-05,
+      "stages_0_to_4_sum_s": 0.090321,
+      "wall_clock_total_s": 0.091415,
+      "action": {
+        "shape": [
+          1,
+          6
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "min": -0.39810889959335327,
+        "max": 0.19139112532138824,
+        "mean": -0.09570863842964172,
+        "finite": true,
+        "sample": [
+          -0.06281795352697372,
+          -0.02878165990114212,
+          -0.1933826208114624,
+          0.19139112532138824,
+          -0.08255180716514587,
+          -0.39810889959335327
+        ]
+      },
+      "share_pct": {
+        "stage0": 26.41,
+        "stage1": 2.13,
+        "stage2": 7.95,
+        "stage3_expert": 63.45,
+        "stage4": 0.06
+      }
+    },
+    {
+      "num_euler_steps": 10,
+      "euler_steps": [
+        {
+          "step": 0,
+          "flow_time": 1.0,
+          "stage1_suffix_embed_s": 0.000215,
+          "stage3_expert_denoise_s": 0.00583,
+          "stage3_euler_update_s": 1.7e-05,
+          "stage3_total_s": 0.005847,
+          "euler_step_total_s": 0.006062
+        },
+        {
+          "step": 1,
+          "flow_time": 0.9,
+          "stage1_suffix_embed_s": 0.000189,
+          "stage3_expert_denoise_s": 0.005749,
+          "stage3_euler_update_s": 1.4e-05,
+          "stage3_total_s": 0.005763,
+          "euler_step_total_s": 0.005952
+        },
+        {
+          "step": 2,
+          "flow_time": 0.8,
+          "stage1_suffix_embed_s": 0.000189,
+          "stage3_expert_denoise_s": 0.005764,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005775,
+          "euler_step_total_s": 0.005965
+        },
+        {
+          "step": 3,
+          "flow_time": 0.7,
+          "stage1_suffix_embed_s": 0.000189,
+          "stage3_expert_denoise_s": 0.005778,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.00579,
+          "euler_step_total_s": 0.005979
+        },
+        {
+          "step": 4,
+          "flow_time": 0.6,
+          "stage1_suffix_embed_s": 0.000186,
+          "stage3_expert_denoise_s": 0.005708,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005719,
+          "euler_step_total_s": 0.005905
+        },
+        {
+          "step": 5,
+          "flow_time": 0.5,
+          "stage1_suffix_embed_s": 0.000195,
+          "stage3_expert_denoise_s": 0.005703,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005714,
+          "euler_step_total_s": 0.005909
+        },
+        {
+          "step": 6,
+          "flow_time": 0.4,
+          "stage1_suffix_embed_s": 0.000194,
+          "stage3_expert_denoise_s": 0.005679,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.00569,
+          "euler_step_total_s": 0.005883
+        },
+        {
+          "step": 7,
+          "flow_time": 0.3,
+          "stage1_suffix_embed_s": 0.000191,
+          "stage3_expert_denoise_s": 0.005727,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005739,
+          "euler_step_total_s": 0.00593
+        },
+        {
+          "step": 8,
+          "flow_time": 0.2,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005693,
+          "stage3_euler_update_s": 1.1e-05,
+          "stage3_total_s": 0.005705,
+          "euler_step_total_s": 0.005893
+        },
+        {
+          "step": 9,
+          "flow_time": 0.1,
+          "stage1_suffix_embed_s": 0.000188,
+          "stage3_expert_denoise_s": 0.005689,
+          "stage3_euler_update_s": 1.2e-05,
+          "stage3_total_s": 0.005701,
+          "euler_step_total_s": 0.005888
+        }
+      ],
+      "shapes": {},
+      "memory": {
+        "after_stage0": {
+          "allocated_mb": 948.54,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 969.09,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_stage2": {
+          "allocated_mb": 954.01,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "after_euler_loop": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "start": {
+          "allocated_mb": 938.17,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 938.17,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        },
+        "end": {
+          "allocated_mb": 954.45,
+          "reserved_mb": 1006.63,
+          "max_allocated_mb": 970.96,
+          "max_reserved_mb": 1006.63,
+          "free_mb": 15411.25,
+          "total_mb": 16620.26
+        }
+      },
+      "stage0_prefix_embed_s": 0.023875,
+      "stage2_prefill_s": 0.007187,
+      "stage1_suffix_embed_s": 0.001925,
+      "stage3_expert_denoise_s": 0.057319,
+      "stage3_euler_update_s": 0.000123,
+      "stage3_expert_plus_euler_s": 0.057442,
+      "stage3_inclusive_with_stage1_s": 0.059367,
+      "stage4_crop_queue_postprocess_s": 5.2e-05,
+      "stages_0_to_4_sum_s": 0.090481,
+      "wall_clock_total_s": 0.091579,
+      "action": {
+        "shape": [
+          1,
+          6
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "min": -0.39810889959335327,
+        "max": 0.19139112532138824,
+        "mean": -0.09570863842964172,
+        "finite": true,
+        "sample": [
+          -0.06281795352697372,
+          -0.02878165990114212,
+          -0.1933826208114624,
+          0.19139112532138824,
+          -0.08255180716514587,
+          -0.39810889959335327
+        ]
+      },
+      "share_pct": {
+        "stage0": 26.39,
+        "stage1": 2.13,
+        "stage2": 7.94,
+        "stage3_expert": 63.49,
+        "stage4": 0.06
+      }
+    }
+  ],
+  "aggregate": {
+    "stage0_prefix_embed_s": {
+      "n": 5,
+      "min_s": 0.023852,
+      "max_s": 0.023987,
+      "mean_s": 0.023885,
+      "std_s": 5.2e-05,
+      "p50_s": 0.023857,
+      "p90_s": 0.023875,
+      "all_s": [
+        0.023987,
+        0.023852,
+        0.023857,
+        0.023855,
+        0.023875
+      ]
+    },
+    "stage1_suffix_embed_s": {
+      "n": 5,
+      "min_s": 0.001917,
+      "max_s": 0.001946,
+      "mean_s": 0.001926,
+      "std_s": 1.1e-05,
+      "p50_s": 0.001921,
+      "p90_s": 0.001925,
+      "all_s": [
+        0.001917,
+        0.001919,
+        0.001946,
+        0.001921,
+        0.001925
+      ]
+    },
+    "stage2_prefill_s": {
+      "n": 5,
+      "min_s": 0.007172,
+      "max_s": 0.00719,
+      "mean_s": 0.007184,
+      "std_s": 7e-06,
+      "p50_s": 0.007187,
+      "p90_s": 0.00719,
+      "all_s": [
+        0.00719,
+        0.007172,
+        0.00719,
+        0.007183,
+        0.007187
+      ]
+    },
+    "stage3_expert_denoise_s": {
+      "n": 5,
+      "min_s": 0.056917,
+      "max_s": 0.057319,
+      "mean_s": 0.05709,
+      "std_s": 0.000154,
+      "p50_s": 0.057104,
+      "p90_s": 0.057184,
+      "all_s": [
+        0.057104,
+        0.056927,
+        0.056917,
+        0.057184,
+        0.057319
+      ]
+    },
+    "stage3_euler_update_s": {
+      "n": 5,
+      "min_s": 0.000118,
+      "max_s": 0.000136,
+      "mean_s": 0.000124,
+      "std_s": 6e-06,
+      "p50_s": 0.000123,
+      "p90_s": 0.000125,
+      "all_s": [
+        0.000136,
+        0.000118,
+        0.00012,
+        0.000125,
+        0.000123
+      ]
+    },
+    "stage3_expert_plus_euler_s": {
+      "n": 5,
+      "min_s": 0.057037,
+      "max_s": 0.057442,
+      "mean_s": 0.057215,
+      "std_s": 0.000156,
+      "p50_s": 0.057241,
+      "p90_s": 0.05731,
+      "all_s": [
+        0.057241,
+        0.057045,
+        0.057037,
+        0.05731,
+        0.057442
+      ]
+    },
+    "stage3_inclusive_with_stage1_s": {
+      "n": 5,
+      "min_s": 0.058964,
+      "max_s": 0.059367,
+      "mean_s": 0.05914,
+      "std_s": 0.000152,
+      "p50_s": 0.059158,
+      "p90_s": 0.05923,
+      "all_s": [
+        0.059158,
+        0.058964,
+        0.058983,
+        0.05923,
+        0.059367
+      ]
+    },
+    "stage4_crop_queue_postprocess_s": {
+      "n": 5,
+      "min_s": 5.2e-05,
+      "max_s": 5.3e-05,
+      "mean_s": 5.2e-05,
+      "std_s": 0.0,
+      "p50_s": 5.2e-05,
+      "p90_s": 5.2e-05,
+      "all_s": [
+        5.2e-05,
+        5.2e-05,
+        5.3e-05,
+        5.2e-05,
+        5.2e-05
+      ]
+    },
+    "stages_0_to_4_sum_s": {
+      "n": 5,
+      "min_s": 0.090039,
+      "max_s": 0.090481,
+      "mean_s": 0.090262,
+      "std_s": 0.000173,
+      "p50_s": 0.090321,
+      "p90_s": 0.090387,
+      "all_s": [
+        0.090387,
+        0.090039,
+        0.090083,
+        0.090321,
+        0.090481
+      ]
+    },
+    "wall_clock_total_s": {
+      "n": 5,
+      "min_s": 0.091123,
+      "max_s": 0.091579,
+      "mean_s": 0.091327,
+      "std_s": 0.000166,
+      "p50_s": 0.091347,
+      "p90_s": 0.091415,
+      "all_s": [
+        0.091347,
+        0.091123,
+        0.09117,
+        0.091415,
+        0.091579
+      ]
+    },
+    "per_euler_step": [
+      {
+        "step": 0,
+        "flow_time": 1.0,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000208,
+          "max_s": 0.000215,
+          "mean_s": 0.000211,
+          "std_s": 3e-06,
+          "p50_s": 0.000212,
+          "p90_s": 0.000213,
+          "all_s": [
+            0.000212,
+            0.000208,
+            0.000213,
+            0.000208,
+            0.000215
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005804,
+          "max_s": 0.005836,
+          "mean_s": 0.005828,
+          "std_s": 1.2e-05,
+          "p50_s": 0.005834,
+          "p90_s": 0.005835,
+          "all_s": [
+            0.005835,
+            0.005834,
+            0.005804,
+            0.005836,
+            0.00583
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.7e-05,
+          "mean_s": 1.5e-05,
+          "std_s": 3e-06,
+          "p50_s": 1.7e-05,
+          "p90_s": 1.7e-05,
+          "all_s": [
+            1.7e-05,
+            1.7e-05,
+            1.1e-05,
+            1.2e-05,
+            1.7e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.006028,
+          "max_s": 0.006064,
+          "mean_s": 0.006054,
+          "std_s": 1.3e-05,
+          "p50_s": 0.006059,
+          "p90_s": 0.006062,
+          "all_s": [
+            0.006064,
+            0.006059,
+            0.006028,
+            0.006056,
+            0.006062
+          ]
+        }
+      },
+      {
+        "step": 1,
+        "flow_time": 0.9,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000189,
+          "max_s": 0.000198,
+          "mean_s": 0.000192,
+          "std_s": 4e-06,
+          "p50_s": 0.000189,
+          "p90_s": 0.000194,
+          "all_s": [
+            0.000194,
+            0.000189,
+            0.000198,
+            0.000189,
+            0.000189
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005713,
+          "max_s": 0.005769,
+          "mean_s": 0.005738,
+          "std_s": 1.9e-05,
+          "p50_s": 0.005733,
+          "p90_s": 0.005749,
+          "all_s": [
+            0.005725,
+            0.005713,
+            0.005769,
+            0.005733,
+            0.005749
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.4e-05,
+          "mean_s": 1.2e-05,
+          "std_s": 1e-06,
+          "p50_s": 1.2e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.2e-05,
+            1.1e-05,
+            1.2e-05,
+            1.1e-05,
+            1.4e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005914,
+          "max_s": 0.005979,
+          "mean_s": 0.005942,
+          "std_s": 2.2e-05,
+          "p50_s": 0.005933,
+          "p90_s": 0.005952,
+          "all_s": [
+            0.00593,
+            0.005914,
+            0.005979,
+            0.005933,
+            0.005952
+          ]
+        }
+      },
+      {
+        "step": 2,
+        "flow_time": 0.8,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000188,
+          "max_s": 0.000197,
+          "mean_s": 0.000192,
+          "std_s": 3e-06,
+          "p50_s": 0.000192,
+          "p90_s": 0.000194,
+          "all_s": [
+            0.000192,
+            0.000188,
+            0.000197,
+            0.000194,
+            0.000189
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005677,
+          "max_s": 0.005764,
+          "mean_s": 0.005723,
+          "std_s": 3.7e-05,
+          "p50_s": 0.005736,
+          "p90_s": 0.005755,
+          "all_s": [
+            0.005736,
+            0.005682,
+            0.005677,
+            0.005755,
+            0.005764
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.2e-05,
+          "mean_s": 1.1e-05,
+          "std_s": 0.0,
+          "p50_s": 1.1e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.2e-05,
+            1.1e-05,
+            1.1e-05,
+            1.1e-05,
+            1.2e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.00588,
+          "max_s": 0.005965,
+          "mean_s": 0.005926,
+          "std_s": 3.7e-05,
+          "p50_s": 0.00594,
+          "p90_s": 0.00596,
+          "all_s": [
+            0.00594,
+            0.00588,
+            0.005885,
+            0.00596,
+            0.005965
+          ]
+        }
+      },
+      {
+        "step": 3,
+        "flow_time": 0.7,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000188,
+          "max_s": 0.000194,
+          "mean_s": 0.00019,
+          "std_s": 2e-06,
+          "p50_s": 0.000189,
+          "p90_s": 0.00019,
+          "all_s": [
+            0.000194,
+            0.000188,
+            0.00019,
+            0.000188,
+            0.000189
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005655,
+          "max_s": 0.005778,
+          "mean_s": 0.0057,
+          "std_s": 5e-05,
+          "p50_s": 0.005668,
+          "p90_s": 0.005739,
+          "all_s": [
+            0.005668,
+            0.005655,
+            0.00566,
+            0.005739,
+            0.005778
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.7e-05,
+          "mean_s": 1.2e-05,
+          "std_s": 2e-06,
+          "p50_s": 1.1e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.7e-05,
+            1.1e-05,
+            1.1e-05,
+            1.1e-05,
+            1.2e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005854,
+          "max_s": 0.005979,
+          "mean_s": 0.005902,
+          "std_s": 4.9e-05,
+          "p50_s": 0.005879,
+          "p90_s": 0.005939,
+          "all_s": [
+            0.005879,
+            0.005854,
+            0.00586,
+            0.005939,
+            0.005979
+          ]
+        }
+      },
+      {
+        "step": 4,
+        "flow_time": 0.6,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000186,
+          "max_s": 0.000192,
+          "mean_s": 0.000188,
+          "std_s": 3e-06,
+          "p50_s": 0.000187,
+          "p90_s": 0.000191,
+          "all_s": [
+            0.000187,
+            0.000186,
+            0.000191,
+            0.000192,
+            0.000186
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005635,
+          "max_s": 0.005716,
+          "mean_s": 0.00569,
+          "std_s": 3e-05,
+          "p50_s": 0.005708,
+          "p90_s": 0.00571,
+          "all_s": [
+            0.00571,
+            0.005635,
+            0.005679,
+            0.005716,
+            0.005708
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.7e-05,
+          "mean_s": 1.2e-05,
+          "std_s": 2e-06,
+          "p50_s": 1.1e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.7e-05,
+            1.2e-05,
+            1.1e-05,
+            1.1e-05,
+            1.1e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005833,
+          "max_s": 0.00592,
+          "mean_s": 0.005891,
+          "std_s": 3.2e-05,
+          "p50_s": 0.005905,
+          "p90_s": 0.005914,
+          "all_s": [
+            0.005914,
+            0.005833,
+            0.005881,
+            0.00592,
+            0.005905
+          ]
+        }
+      },
+      {
+        "step": 5,
+        "flow_time": 0.5,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000189,
+          "max_s": 0.000195,
+          "mean_s": 0.000191,
+          "std_s": 2e-06,
+          "p50_s": 0.000191,
+          "p90_s": 0.000192,
+          "all_s": [
+            0.000189,
+            0.00019,
+            0.000191,
+            0.000192,
+            0.000195
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.00568,
+          "max_s": 0.005742,
+          "mean_s": 0.005698,
+          "std_s": 2.3e-05,
+          "p50_s": 0.005684,
+          "p90_s": 0.005703,
+          "all_s": [
+            0.005684,
+            0.005742,
+            0.00568,
+            0.005683,
+            0.005703
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.6e-05,
+          "mean_s": 1.2e-05,
+          "std_s": 2e-06,
+          "p50_s": 1.2e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.6e-05,
+            1.1e-05,
+            1.2e-05,
+            1.2e-05,
+            1.1e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005883,
+          "max_s": 0.005944,
+          "mean_s": 0.005902,
+          "std_s": 2.3e-05,
+          "p50_s": 0.005889,
+          "p90_s": 0.005909,
+          "all_s": [
+            0.005889,
+            0.005944,
+            0.005883,
+            0.005887,
+            0.005909
+          ]
+        }
+      },
+      {
+        "step": 6,
+        "flow_time": 0.4,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000186,
+          "max_s": 0.000204,
+          "mean_s": 0.000193,
+          "std_s": 6e-06,
+          "p50_s": 0.000191,
+          "p90_s": 0.000194,
+          "all_s": [
+            0.00019,
+            0.000191,
+            0.000204,
+            0.000186,
+            0.000194
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005677,
+          "max_s": 0.00569,
+          "mean_s": 0.005683,
+          "std_s": 5e-06,
+          "p50_s": 0.005681,
+          "p90_s": 0.005688,
+          "all_s": [
+            0.005681,
+            0.00569,
+            0.005677,
+            0.005688,
+            0.005679
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.2e-05,
+          "mean_s": 1.1e-05,
+          "std_s": 0.0,
+          "p50_s": 1.1e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.1e-05,
+            1.1e-05,
+            1.2e-05,
+            1.2e-05,
+            1.1e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005882,
+          "max_s": 0.005892,
+          "mean_s": 0.005887,
+          "std_s": 4e-06,
+          "p50_s": 0.005886,
+          "p90_s": 0.005892,
+          "all_s": [
+            0.005882,
+            0.005892,
+            0.005892,
+            0.005886,
+            0.005883
+          ]
+        }
+      },
+      {
+        "step": 7,
+        "flow_time": 0.3,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000185,
+          "max_s": 0.000194,
+          "mean_s": 0.00019,
+          "std_s": 3e-06,
+          "p50_s": 0.000191,
+          "p90_s": 0.000192,
+          "all_s": [
+            0.000185,
+            0.000194,
+            0.000187,
+            0.000192,
+            0.000191
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005648,
+          "max_s": 0.005727,
+          "mean_s": 0.005684,
+          "std_s": 2.7e-05,
+          "p50_s": 0.005685,
+          "p90_s": 0.005697,
+          "all_s": [
+            0.005685,
+            0.005648,
+            0.005663,
+            0.005697,
+            0.005727
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.5e-05,
+          "mean_s": 1.2e-05,
+          "std_s": 1e-06,
+          "p50_s": 1.2e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.1e-05,
+            1.2e-05,
+            1.1e-05,
+            1.5e-05,
+            1.2e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005854,
+          "max_s": 0.00593,
+          "mean_s": 0.005886,
+          "std_s": 2.8e-05,
+          "p50_s": 0.005882,
+          "p90_s": 0.005904,
+          "all_s": [
+            0.005882,
+            0.005854,
+            0.005862,
+            0.005904,
+            0.00593
+          ]
+        }
+      },
+      {
+        "step": 8,
+        "flow_time": 0.2,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000186,
+          "max_s": 0.000192,
+          "mean_s": 0.000189,
+          "std_s": 3e-06,
+          "p50_s": 0.000188,
+          "p90_s": 0.000192,
+          "all_s": [
+            0.000186,
+            0.000192,
+            0.000187,
+            0.000192,
+            0.000188
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005626,
+          "max_s": 0.005705,
+          "mean_s": 0.005669,
+          "std_s": 2.8e-05,
+          "p50_s": 0.005663,
+          "p90_s": 0.005693,
+          "all_s": [
+            0.005705,
+            0.005626,
+            0.005657,
+            0.005663,
+            0.005693
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.6e-05,
+          "mean_s": 1.3e-05,
+          "std_s": 2e-06,
+          "p50_s": 1.1e-05,
+          "p90_s": 1.6e-05,
+          "all_s": [
+            1.1e-05,
+            1.1e-05,
+            1.6e-05,
+            1.6e-05,
+            1.1e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005829,
+          "max_s": 0.005903,
+          "mean_s": 0.005871,
+          "std_s": 2.6e-05,
+          "p50_s": 0.005871,
+          "p90_s": 0.005893,
+          "all_s": [
+            0.005903,
+            0.005829,
+            0.00586,
+            0.005871,
+            0.005893
+          ]
+        }
+      },
+      {
+        "step": 9,
+        "flow_time": 0.1,
+        "stage1_suffix_embed": {
+          "n": 5,
+          "min_s": 0.000186,
+          "max_s": 0.000192,
+          "mean_s": 0.000188,
+          "std_s": 2e-06,
+          "p50_s": 0.000188,
+          "p90_s": 0.000188,
+          "all_s": [
+            0.000188,
+            0.000192,
+            0.000188,
+            0.000186,
+            0.000188
+          ]
+        },
+        "stage3_expert_denoise": {
+          "n": 5,
+          "min_s": 0.005651,
+          "max_s": 0.005702,
+          "mean_s": 0.005678,
+          "std_s": 1.7e-05,
+          "p50_s": 0.005675,
+          "p90_s": 0.005689,
+          "all_s": [
+            0.005675,
+            0.005702,
+            0.005651,
+            0.005675,
+            0.005689
+          ]
+        },
+        "stage3_euler_update": {
+          "n": 5,
+          "min_s": 1.1e-05,
+          "max_s": 1.4e-05,
+          "mean_s": 1.2e-05,
+          "std_s": 1e-06,
+          "p50_s": 1.2e-05,
+          "p90_s": 1.2e-05,
+          "all_s": [
+            1.1e-05,
+            1.1e-05,
+            1.2e-05,
+            1.4e-05,
+            1.2e-05
+          ]
+        },
+        "euler_step_total": {
+          "n": 5,
+          "min_s": 0.005851,
+          "max_s": 0.005905,
+          "mean_s": 0.005879,
+          "std_s": 1.8e-05,
+          "p50_s": 0.005876,
+          "p90_s": 0.005888,
+          "all_s": [
+            0.005874,
+            0.005905,
+            0.005851,
+            0.005876,
+            0.005888
+          ]
+        }
+      }
+    ],
+    "derived": {
+      "chunk_fill_hz_mean": 10.95,
+      "action_step_hz_if_queue_drained_mean": 547.483,
+      "ms_per_euler_step_mean": 5.914,
+      "ms_stage0_mean": 23.885,
+      "ms_stage2_mean": 7.184,
+      "ms_stage3_loop_mean": 59.14,
+      "note": "chunk_fill_hz = 1 / wall_clock for one full 50-action chunk fill (prefix+prefill+10 Euler). action_step_hz assumes the 50 queued actions are consumed one-per-control-tick with no extra model calls."
+    }
+  },
+  "memory_peak_across_runs": {
+    "after_stage0": {
+      "allocated_mb": 948.54,
+      "reserved_mb": 1006.63,
+      "max_allocated_mb": 969.09,
+      "max_reserved_mb": 1006.63,
+      "free_mb": 15411.25,
+      "total_mb": 16620.26
+    },
+    "after_stage2": {
+      "allocated_mb": 954.01,
+      "reserved_mb": 1006.63,
+      "max_allocated_mb": 970.96,
+      "max_reserved_mb": 1006.63,
+      "free_mb": 15411.25,
+      "total_mb": 16620.26
+    },
+    "after_euler_loop": {
+      "allocated_mb": 954.45,
+      "reserved_mb": 1006.63,
+      "max_allocated_mb": 970.96,
+      "max_reserved_mb": 1006.63,
+      "free_mb": 15411.25,
+      "total_mb": 16620.26
+    },
+    "end_last_run": {
+      "allocated_mb": 954.45,
+      "reserved_mb": 1006.63,
+      "max_allocated_mb": 970.96,
+      "max_reserved_mb": 1006.63,
+      "free_mb": 15411.25,
+      "total_mb": 16620.26
+    },
+    "max_allocated_mb_across_runs": 970.96,
+    "max_reserved_mb_across_runs": 1006.63
+  },
+  "cpu_comparison": {
+    "cpu_baseline_file": "/workspace/vla_analysis/smoke_test_report_cpu.json",
+    "cpu_host": "575cd14fb466",
+    "cpu_torch": "2.11.0+cpu",
+    "cpu_wall_s": 20.1288,
+    "cpu_share_pct": {
+      "stage0": 74.56,
+      "stage1": 0.06,
+      "stage2": 9.6,
+      "stage3_expert": 15.77,
+      "stage4": 0.0
+    },
+    "rows": [
+      {
+        "metric": "stage0_prefix_embed_s",
+        "cpu_s": 15.0085,
+        "gpu_mean_s": 0.023885,
+        "speedup": 628.37,
+        "cpu_share_of_wall_pct": 74.56,
+        "gpu_share_of_wall_pct": 26.15
+      },
+      {
+        "metric": "stage1_suffix_embed_s",
+        "cpu_s": 0.0114,
+        "gpu_mean_s": 0.001926,
+        "speedup": 5.92,
+        "cpu_share_of_wall_pct": 0.06,
+        "gpu_share_of_wall_pct": 2.11
+      },
+      {
+        "metric": "stage2_prefill_s",
+        "cpu_s": 1.9332,
+        "gpu_mean_s": 0.007184,
+        "speedup": 269.1,
+        "cpu_share_of_wall_pct": 9.6,
+        "gpu_share_of_wall_pct": 7.87
+      },
+      {
+        "metric": "stage3_expert_denoise_s",
+        "cpu_s": 3.1749,
+        "gpu_mean_s": 0.05709,
+        "speedup": 55.61,
+        "cpu_share_of_wall_pct": 15.77,
+        "gpu_share_of_wall_pct": 62.51
+      },
+      {
+        "metric": "stage3_euler_update_s",
+        "cpu_s": 0.0003,
+        "gpu_mean_s": 0.000124,
+        "speedup": 2.42,
+        "cpu_share_of_wall_pct": 0.0,
+        "gpu_share_of_wall_pct": 0.14
+      },
+      {
+        "metric": "stage3_expert_plus_euler_s",
+        "cpu_s": 3.1752,
+        "gpu_mean_s": 0.057215,
+        "speedup": 55.5,
+        "cpu_share_of_wall_pct": 15.77,
+        "gpu_share_of_wall_pct": 62.65
+      },
+      {
+        "metric": "stage4_crop_queue_postprocess_s",
+        "cpu_s": 0.0001,
+        "gpu_mean_s": 5.2e-05,
+        "speedup": 1.92,
+        "cpu_share_of_wall_pct": 0.0,
+        "gpu_share_of_wall_pct": 0.06
+      },
+      {
+        "metric": "stages_0_to_4_sum_s",
+        "cpu_s": 20.1284,
+        "gpu_mean_s": 0.090262,
+        "speedup": 223.0,
+        "cpu_share_of_wall_pct": 100.0,
+        "gpu_share_of_wall_pct": 98.83
+      },
+      {
+        "metric": "wall_clock_total_s",
+        "cpu_s": 20.1288,
+        "gpu_mean_s": 0.091327,
+        "speedup": 220.4,
+        "cpu_share_of_wall_pct": 100.0,
+        "gpu_share_of_wall_pct": 100.0
+      }
+    ],
+    "cpu_action_sample": [
+      -0.06372098624706268,
+      -0.029679380357265472,
+      -0.19337990880012512,
+      0.19098371267318726,
+      -0.08119942247867584,
+      -0.39644908905029297
+    ]
+  }
+}

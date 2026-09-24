@@ -1,9 +1,14 @@
 #!/usr/bin/env python
-"""CPU-only SmolVLA inference smoke test.
+"""SmolVLA inference smoke test (CPU or CUDA).
 
 Fixed observation + fixed flow-matching noise (SMOKE_SEED) for reproducible
 actions across runs. Checks shape/finiteness/magnitude and run-to-run equality.
-Does not train. Does not use GPU.
+Does not train.
+
+Device selection via SMOKE_DEVICE:
+  - cpu   : force CPU (also clears CUDA_VISIBLE_DEVICES)
+  - cuda  : require CUDA and run on GPU
+  - auto  : cuda if available else cpu (default)
 """
 
 from __future__ import annotations
@@ -17,14 +22,31 @@ import time
 import traceback
 from pathlib import Path
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ.setdefault("OMP_NUM_THREADS", "6")
 os.environ.setdefault("MKL_NUM_THREADS", "6")
 
+_SMOKE_DEVICE_REQ = os.environ.get("SMOKE_DEVICE", "auto").strip().lower()
+if _SMOKE_DEVICE_REQ == "cpu":
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 import torch
 
-assert not torch.cuda.is_available(), "CUDA unexpectedly available; this smoke test must stay CPU-only"
 torch.set_num_threads(int(os.environ["OMP_NUM_THREADS"]))
+
+
+def _resolve_device(req: str) -> torch.device:
+    if req in ("", "auto"):
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if req == "cpu":
+        return torch.device("cpu")
+    if req == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("SMOKE_DEVICE=cuda but torch.cuda.is_available() is False")
+        return torch.device("cuda")
+    raise ValueError(f"Unknown SMOKE_DEVICE={req!r}; use auto|cpu|cuda")
+
+
+DEVICE = _resolve_device(_SMOKE_DEVICE_REQ)
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.policies.factory import make_pre_post_processors
@@ -35,12 +57,18 @@ from lerobot.utils.constants import OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TO
 
 MODEL_ID = "lerobot/smolvla_base"
 DATASET_ID = "lerobot/libero"
-OUT_PATH = Path(__file__).resolve().parents[1] / "smoke_test_report.json"
+_REPORT_NAME = "smoke_test_report_gpu.json" if DEVICE.type == "cuda" else "smoke_test_report.json"
+OUT_PATH = Path(__file__).resolve().parents[1] / _REPORT_NAME
 # Fixed seed for reproducible inputs + flow-matching noise across runs.
 SMOKE_SEED = 0
 FIXED_TASK = "Put lego brick into the transparent box"
 # Post-unnormalize action sanity bounds (SO-100-scale joint/gripper units).
 ACTION_ABS_MAX = 500.0
+
+
+def _sync() -> None:
+    if DEVICE.type == "cuda":
+        torch.cuda.synchronize()
 
 
 def _now() -> float:
@@ -69,15 +97,20 @@ def _make_generator(device: torch.device | str = "cpu") -> torch.Generator:
 
 
 def make_fixed_noise(shape: tuple[int, ...], device: torch.device | str) -> torch.Tensor:
-    """Deterministic N(0,1) flow-matching noise (same across runs)."""
-    return torch.normal(
+    """Deterministic N(0,1) flow-matching noise (same across runs/devices).
+
+    Always sample on CPU with SMOKE_SEED, then move, so CPU and CUDA get
+    bit-identical noise for cross-device comparison.
+    """
+    noise = torch.normal(
         mean=0.0,
         std=1.0,
         size=shape,
         dtype=torch.float32,
-        device=device,
-        generator=_make_generator(device),
+        device="cpu",
+        generator=_make_generator("cpu"),
     )
+    return noise.to(device=device, dtype=torch.float32)
 
 
 def make_dummy_frame(config) -> dict:
@@ -238,7 +271,7 @@ def profile_stage_timings(
     noise: torch.Tensor | None = None,
     warmup: bool = True,
 ) -> dict:
-    """Wall-clock Stage 0-4 timings for one action-chunk fill on CPU.
+    """Wall-clock Stage 0-4 timings for one action-chunk fill.
 
     Stage boundaries follow SmolVLA_Operator_List.md / Architecture.md:
       Stage 0: prefix embedding (images + language + state -> P)
@@ -248,6 +281,7 @@ def profile_stage_timings(
       Stage 4: crop, queue, and postprocess unnormalization of one popped action
 
     Stage 1 runs inside every Euler step; Stage 3 inclusive = Stage 1 + Stage 3 expert.
+    CUDA timings call torch.cuda.synchronize() around each stage.
     """
     model = policy.model
     cfg = policy.config
@@ -269,9 +303,11 @@ def profile_stage_timings(
             "num_euler_steps": num_steps,
         }
 
+        _sync()
         t_all0 = _now()
 
         # --- Stage 0: prepare + embed_prefix ---
+        _sync()
         t0 = _now()
         images, img_masks = policy.prepare_images(batch)
         state = policy.prepare_state(batch)
@@ -280,10 +316,12 @@ def profile_stage_timings(
         prefix_embs, prefix_pad_masks, prefix_att_masks = model.embed_prefix(
             images, img_masks, lang_tokens, lang_masks, state=state
         )
+        _sync()
         if record:
             times["stage0_prefix_embed_s"] = _now() - t0
 
         # --- Stage 2: prefill KV cache ---
+        _sync()
         t0 = _now()
         prefix_att_2d_masks = make_att_2d_masks(prefix_pad_masks, prefix_att_masks)
         prefix_position_ids = torch.cumsum(prefix_pad_masks, dim=1) - 1
@@ -294,6 +332,7 @@ def profile_stage_timings(
             inputs_embeds=[prefix_embs, None],
             use_cache=cfg.use_cache,
         )
+        _sync()
         if record:
             times["stage2_prefill_s"] = _now() - t0
 
@@ -313,12 +352,15 @@ def profile_stage_timings(
             time_tensor = torch.tensor(time_value, dtype=torch.float32, device=device).expand(bsize)
 
             # Stage 1: rebuild suffix
+            _sync()
             t0 = _now()
             suffix_embs, suffix_pad_masks, suffix_att_masks = model.embed_suffix(x_t, time_tensor)
+            _sync()
             if record:
                 times["stage1_suffix_embed_s"] += _now() - t0
 
             # Stage 3: expert denoise (masks + expert forward + velocity head + cache crop)
+            _sync()
             t0 = _now()
             suffix_len = suffix_pad_masks.shape[1]
             batch_size = prefix_pad_masks.shape[0]
@@ -341,17 +383,21 @@ def profile_stage_timings(
             suffix_out = suffix_out[:, -cfg.chunk_size :]
             suffix_out = suffix_out.to(dtype=torch.float32)
             v_t = model.action_out_proj(suffix_out)
+            _sync()
             if record:
                 times["stage3_expert_denoise_s"] += _now() - t0
 
+            _sync()
             t0 = _now()
             x_t = x_t + dt * v_t
+            _sync()
             if record:
                 times["stage3_euler_update_s"] += _now() - t0
 
         actions = x_t
 
         # --- Stage 4: crop, optional aloha, queue, pop one, postprocess ---
+        _sync()
         t0 = _now()
         actions = actions[:, :, :original_action_dim]
         if cfg.adapt_to_pi_aloha:
@@ -359,6 +405,7 @@ def profile_stage_timings(
         queue = list(actions.transpose(0, 1)[: cfg.n_action_steps])
         one = queue.pop(0)
         one = postprocess(one)
+        _sync()
         if record:
             times["stage4_crop_queue_postprocess_s"] = _now() - t0
 
@@ -378,6 +425,7 @@ def profile_stage_timings(
             + times["stage3_expert_plus_euler_s"]
             + times["stage4_crop_queue_postprocess_s"]
         )
+        _sync()
         times["wall_clock_total_s"] = _now() - t_all0
         times["action"] = _summarize_tensor(one)
 
@@ -403,19 +451,31 @@ def profile_stage_timings(
 
 
 def main() -> int:
+    device_str = str(DEVICE)
     report: dict = {
         "hostname": socket.gethostname(),
         "python": sys.version.split()[0],
         "torch": torch.__version__,
         "cuda_available": torch.cuda.is_available(),
-        "device_forced": "cpu",
+        "smoke_device_req": _SMOKE_DEVICE_REQ,
+        "device_forced": device_str,
         "model_id": MODEL_ID,
         "dataset_id": DATASET_ID,
         "steps": {},
     }
+    if DEVICE.type == "cuda":
+        report["cuda"] = {
+            "device_name": torch.cuda.get_device_name(0),
+            "device_capability": list(torch.cuda.get_device_capability(0)),
+            "driver_cuda_version": torch.version.cuda,
+            "memory_gb": round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2),
+        }
     overall_t0 = _now()
-    print("=== SmolVLA CPU inference smoke test ===", flush=True)
-    print(f"torch={torch.__version__} cuda={torch.cuda.is_available()}", flush=True)
+    print(f"=== SmolVLA {device_str.upper()} inference smoke test ===", flush=True)
+    print(
+        f"torch={torch.__version__} cuda={torch.cuda.is_available()} device={device_str}",
+        flush=True,
+    )
 
     print("\n[1/6] Probe real-world CLIs (no robot hardware expected)", flush=True)
     t0 = _now()
@@ -423,14 +483,14 @@ def main() -> int:
     report["steps"]["cli_probe_s"] = round(_now() - t0, 2)
     print(json.dumps(report["real_world_cli"], indent=2)[:2000], flush=True)
 
-    print("\n[2/6] Load SmolVLAPolicy.from_pretrained on CPU", flush=True)
+    print(f"\n[2/6] Load SmolVLAPolicy.from_pretrained on {device_str}", flush=True)
     t0 = _now()
     config = PreTrainedConfig.from_pretrained(MODEL_ID)
-    config.device = "cpu"
+    config.device = device_str
     print(f"config.device={config.device} type={config.type}", flush=True)
     print(f"input_features={list(config.input_features)}", flush=True)
     print(f"output_features={list(config.output_features)}", flush=True)
-    policy = SmolVLAPolicy.from_pretrained(MODEL_ID, config=config).to("cpu").eval()
+    policy = SmolVLAPolicy.from_pretrained(MODEL_ID, config=config).to(DEVICE).eval()
     n_params = sum(p.numel() for p in policy.parameters())
     n_trainable = sum(p.numel() for p in policy.parameters() if p.requires_grad)
     devices = sorted({str(p.device) for p in policy.parameters()})
@@ -448,15 +508,17 @@ def main() -> int:
         "output_features": {k: list(v.shape) for k, v in config.output_features.items()},
     }
     print(f"loaded params={n_params:,} devices={devices} dtypes={dtypes} in {report['model']['load_seconds']}s", flush=True)
-    if any(d.startswith("cuda") for d in devices):
-        raise RuntimeError(f"Model parameters landed on GPU: {devices}")
+    if DEVICE.type == "cpu" and any(d.startswith("cuda") for d in devices):
+        raise RuntimeError(f"Model parameters landed on GPU while SMOKE_DEVICE=cpu: {devices}")
+    if DEVICE.type == "cuda" and not any(d.startswith("cuda") for d in devices):
+        raise RuntimeError(f"Expected CUDA parameters, got: {devices}")
 
     print("\n[3/6] Build pre/post processors", flush=True)
     t0 = _now()
     preprocess, postprocess = make_pre_post_processors(
         policy.config,
         MODEL_ID,
-        preprocessor_overrides={"device_processor": {"device": "cpu"}},
+        preprocessor_overrides={"device_processor": {"device": device_str}},
     )
     report["processors"] = {"seconds": round(_now() - t0, 2)}
 
@@ -476,28 +538,31 @@ def main() -> int:
     print(json.dumps(report["dataset"], indent=2), flush=True)
 
     # Fixed flow-matching noise for select_action / profile (B, chunk, max_action_dim).
+    # Sampled on CPU then moved so CPU/CUDA share identical noise.
     noise = make_fixed_noise(
         (1, int(policy.config.chunk_size), int(policy.config.max_action_dim)),
-        device="cpu",
+        device=DEVICE,
     )
 
-    print("\n[5/6] Run select_action twice on CPU (fixed input + noise)", flush=True)
+    print(f"\n[5/6] Run select_action twice on {device_str} (fixed input + noise)", flush=True)
     t0 = _now()
     batch = preprocess(frame)
     reasonableness = []
     with torch.inference_mode():
         policy.reset()
         pred1 = postprocess(policy.select_action(batch, noise=noise.clone()))
+        _sync()
         reasonableness.append(assert_action_reasonable(pred1, label="run1"))
 
         policy.reset()
         pred2 = postprocess(policy.select_action(batch, noise=noise.clone()))
+        _sync()
         reasonableness.append(assert_action_reasonable(pred2, label="run2"))
 
     max_abs_diff = float((pred1 - pred2).abs().max())
     identical = bool(torch.equal(pred1, pred2))
-    # Allow tiny float noise if backends ever differ; CPU eager should be exact.
-    deterministic_ok = identical or max_abs_diff <= 1e-6
+    # Allow tiny float noise if backends ever differ; eager should be near-exact.
+    deterministic_ok = identical or max_abs_diff <= 1e-5
     if not deterministic_ok:
         raise AssertionError(
             f"non-deterministic actions across two runs: max_abs_diff={max_abs_diff} "
@@ -521,7 +586,7 @@ def main() -> int:
     }
     print(json.dumps(report["inference"], indent=2), flush=True)
 
-    print("\n[6/6] Profile Stage 0-4 wall-clock timings on CPU", flush=True)
+    print(f"\n[6/6] Profile Stage 0-4 wall-clock timings on {device_str}", flush=True)
     policy.reset()
     stage_profile = profile_stage_timings(
         policy, batch, postprocess, noise=noise.clone(), warmup=True
