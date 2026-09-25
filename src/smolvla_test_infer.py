@@ -9,6 +9,12 @@ Device selection via SMOKE_DEVICE:
   - cpu   : force CPU (also clears CUDA_VISIBLE_DEVICES)
   - cuda  : require CUDA and run on GPU
   - auto  : cuda if available else cpu (default)
+
+Optional torch.compile (GPU):
+  - SMOKE_COMPILE=1|true|yes  → set config.compile_model=True before load
+  - SMOKE_COMPILE_MODE=default|reduce-overhead|max-autotune|max-autotune-no-cudagraphs
+    (default: reduce-overhead — faster first compile than max-autotune)
+  Writes smoke_test_report_gpu_compile.json and compares vs CPU baseline when present.
 """
 
 from __future__ import annotations
@@ -28,6 +34,13 @@ os.environ.setdefault("MKL_NUM_THREADS", "6")
 _SMOKE_DEVICE_REQ = os.environ.get("SMOKE_DEVICE", "auto").strip().lower()
 if _SMOKE_DEVICE_REQ == "cpu":
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+_SMOKE_COMPILE = os.environ.get("SMOKE_COMPILE", "0").strip().lower() in ("1", "true", "yes", "on")
+_SMOKE_COMPILE_MODE = os.environ.get("SMOKE_COMPILE_MODE", "reduce-overhead").strip()
+_CPU_BASELINE_CANDIDATES = (
+    "smoke_test_report.json",
+    "smoke_test_report_cpu.json",
+)
 
 import torch
 
@@ -57,13 +70,24 @@ from lerobot.utils.constants import OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TO
 
 MODEL_ID = "lerobot/smolvla_base"
 DATASET_ID = "lerobot/libero"
-_REPORT_NAME = "smoke_test_report_gpu.json" if DEVICE.type == "cuda" else "smoke_test_report.json"
-OUT_PATH = Path(__file__).resolve().parents[1] / _REPORT_NAME
+_ROOT = Path(__file__).resolve().parents[1]
+if DEVICE.type == "cuda" and _SMOKE_COMPILE:
+    _REPORT_NAME = "smoke_test_report_gpu_compile.json"
+elif DEVICE.type == "cuda":
+    _REPORT_NAME = "smoke_test_report_gpu.json"
+else:
+    _REPORT_NAME = "smoke_test_report.json"
+OUT_PATH = _ROOT / _REPORT_NAME
 # Fixed seed for reproducible inputs + flow-matching noise across runs.
 SMOKE_SEED = 0
 FIXED_TASK = "Put lego brick into the transparent box"
 # Post-unnormalize action sanity bounds (SO-100-scale joint/gripper units).
 ACTION_ABS_MAX = 500.0
+# Cross-device / compile numeric tolerance (bf16 GPU vs CPU; compile may add tiny noise).
+CPU_COMPARE_ABS_TOL = 1e-2
+CPU_COMPARE_ABS_TOL_LOOSE = 1e-1
+# Run-to-run: eager ~exact; compile/CUDA graphs may differ slightly.
+DETERMINISM_ABS_TOL = 1e-5 if not _SMOKE_COMPILE else 1e-3
 
 
 def _sync() -> None:
@@ -450,6 +474,59 @@ def profile_stage_timings(
         return _run_once(record=True)
 
 
+def compare_vs_cpu_baseline(pred: torch.Tensor) -> dict | None:
+    """Compare postprocessed action vs local CPU smoke report, if available."""
+    baseline_path = None
+    for name in _CPU_BASELINE_CANDIDATES:
+        p = _ROOT / name
+        if p.is_file():
+            baseline_path = p
+            break
+    if baseline_path is None:
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": f"no CPU baseline among {_CPU_BASELINE_CANDIDATES}",
+        }
+    try:
+        cpu = json.loads(baseline_path.read_text())
+        sample = cpu["inference"]["action"]["sample"]
+        cpu_t = torch.tensor(sample, dtype=torch.float32)
+        gpu_t = pred.detach().float().cpu().flatten()[: cpu_t.numel()]
+        diffs = (gpu_t - cpu_t).abs()
+        max_abs = float(diffs.max())
+        mean_abs = float(diffs.mean())
+        per_dim = [
+            {
+                "dim": i,
+                "cpu": float(cpu_t[i]),
+                "got": float(gpu_t[i]),
+                "abs_diff": float(diffs[i]),
+            }
+            for i in range(int(cpu_t.numel()))
+        ]
+        return {
+            "ok": max_abs <= CPU_COMPARE_ABS_TOL,
+            "ok_loose": max_abs <= CPU_COMPARE_ABS_TOL_LOOSE,
+            "skipped": False,
+            "baseline_path": str(baseline_path),
+            "baseline_hostname": cpu.get("hostname"),
+            "baseline_device": cpu.get("device_forced") or cpu.get("smoke_device_req"),
+            "max_abs_diff": max_abs,
+            "mean_abs_diff": mean_abs,
+            "tol": CPU_COMPARE_ABS_TOL,
+            "tol_loose": CPU_COMPARE_ABS_TOL_LOOSE,
+            "per_dim": per_dim,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "skipped": False,
+            "error_type": type(exc).__name__,
+            "error": str(exc)[:800],
+        }
+
+
 def main() -> int:
     device_str = str(DEVICE)
     report: dict = {
@@ -459,6 +536,10 @@ def main() -> int:
         "cuda_available": torch.cuda.is_available(),
         "smoke_device_req": _SMOKE_DEVICE_REQ,
         "device_forced": device_str,
+        "compile": {
+            "enabled": bool(_SMOKE_COMPILE),
+            "mode": _SMOKE_COMPILE_MODE if _SMOKE_COMPILE else None,
+        },
         "model_id": MODEL_ID,
         "dataset_id": DATASET_ID,
         "steps": {},
@@ -471,9 +552,11 @@ def main() -> int:
             "memory_gb": round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2),
         }
     overall_t0 = _now()
-    print(f"=== SmolVLA {device_str.upper()} inference smoke test ===", flush=True)
+    mode_tag = f"COMPILE:{_SMOKE_COMPILE_MODE}" if _SMOKE_COMPILE else "EAGER"
+    print(f"=== SmolVLA {device_str.upper()} inference smoke test [{mode_tag}] ===", flush=True)
     print(
-        f"torch={torch.__version__} cuda={torch.cuda.is_available()} device={device_str}",
+        f"torch={torch.__version__} cuda={torch.cuda.is_available()} device={device_str} "
+        f"compile={_SMOKE_COMPILE} mode={_SMOKE_COMPILE_MODE if _SMOKE_COMPILE else '-'}",
         flush=True,
     )
 
@@ -487,6 +570,20 @@ def main() -> int:
     t0 = _now()
     config = PreTrainedConfig.from_pretrained(MODEL_ID)
     config.device = device_str
+    if _SMOKE_COMPILE:
+        if DEVICE.type != "cuda":
+            raise RuntimeError("SMOKE_COMPILE requires SMOKE_DEVICE=cuda")
+        if not hasattr(config, "compile_model"):
+            raise RuntimeError(
+                "Installed LeRobot SmolVLAConfig has no compile_model; upgrade lerobot"
+            )
+        config.compile_model = True
+        config.compile_mode = _SMOKE_COMPILE_MODE
+        print(
+            f"compile_model=True compile_mode={config.compile_mode!r} "
+            f"(first select_action pays torch.compile / Inductor cost)",
+            flush=True,
+        )
     print(f"config.device={config.device} type={config.type}", flush=True)
     print(f"input_features={list(config.input_features)}", flush=True)
     print(f"output_features={list(config.output_features)}", flush=True)
@@ -504,6 +601,8 @@ def main() -> int:
         "chunk_size": getattr(config, "chunk_size", None),
         "n_action_steps": getattr(config, "n_action_steps", None),
         "num_steps": getattr(config, "num_steps", None),
+        "compile_model": bool(getattr(config, "compile_model", False)),
+        "compile_mode": getattr(config, "compile_mode", None),
         "input_features": {k: list(v.shape) for k, v in config.input_features.items()},
         "output_features": {k: list(v.shape) for k, v in config.output_features.items()},
     }
@@ -548,30 +647,39 @@ def main() -> int:
     t0 = _now()
     batch = preprocess(frame)
     reasonableness = []
+    compile_first_s = None
     with torch.inference_mode():
         policy.reset()
+        t_compile0 = _now()
         pred1 = postprocess(policy.select_action(batch, noise=noise.clone()))
         _sync()
+        compile_first_s = round(_now() - t_compile0, 3)
         reasonableness.append(assert_action_reasonable(pred1, label="run1"))
+        print(f"first select_action wall_s={compile_first_s} (includes compile if enabled)", flush=True)
 
         policy.reset()
+        t_run2 = _now()
         pred2 = postprocess(policy.select_action(batch, noise=noise.clone()))
         _sync()
+        run2_s = round(_now() - t_run2, 3)
         reasonableness.append(assert_action_reasonable(pred2, label="run2"))
+        print(f"second select_action wall_s={run2_s}", flush=True)
 
     max_abs_diff = float((pred1 - pred2).abs().max())
     identical = bool(torch.equal(pred1, pred2))
-    # Allow tiny float noise if backends ever differ; eager should be near-exact.
-    deterministic_ok = identical or max_abs_diff <= 1e-5
+    deterministic_ok = identical or max_abs_diff <= DETERMINISM_ABS_TOL
     if not deterministic_ok:
         raise AssertionError(
             f"non-deterministic actions across two runs: max_abs_diff={max_abs_diff} "
-            f"run1={pred1.tolist()} run2={pred2.tolist()}"
+            f"tol={DETERMINISM_ABS_TOL} run1={pred1.tolist()} run2={pred2.tolist()}"
         )
 
     pred_summary = _summarize_tensor(pred1)
+    cpu_cmp = compare_vs_cpu_baseline(pred1)
     report["inference"] = {
         "seconds": round(_now() - t0, 2),
+        "first_select_action_s": compile_first_s,
+        "second_select_action_s": run2_s,
         "batch_source": source,
         "smoke_seed": SMOKE_SEED,
         "fixed_noise": True,
@@ -580,11 +688,18 @@ def main() -> int:
             "runs": 2,
             "identical": identical,
             "max_abs_diff": max_abs_diff,
+            "tol": DETERMINISM_ABS_TOL,
             "ok": deterministic_ok,
         },
+        "cpu_compare": cpu_cmp,
         "reasonableness": reasonableness,
     }
     print(json.dumps(report["inference"], indent=2), flush=True)
+    if cpu_cmp and not cpu_cmp.get("skipped") and not cpu_cmp.get("ok_loose", False):
+        raise AssertionError(
+            f"CPU compare failed beyond loose tol: max_abs={cpu_cmp.get('max_abs_diff')} "
+            f"tol_loose={CPU_COMPARE_ABS_TOL_LOOSE}"
+        )
 
     print(f"\n[6/6] Profile Stage 0-4 wall-clock timings on {device_str}", flush=True)
     policy.reset()
@@ -595,17 +710,32 @@ def main() -> int:
     print(json.dumps(stage_profile, indent=2), flush=True)
 
     report["total_seconds"] = round(_now() - overall_t0, 2)
+    cpu_ok = bool(
+        cpu_cmp
+        and (
+            cpu_cmp.get("skipped")
+            or cpu_cmp.get("ok")
+            or cpu_cmp.get("ok_loose")
+        )
+    )
     report["status"] = (
         "PASS"
         if pred_summary
         and pred_summary.get("finite")
         and deterministic_ok
         and all(r["ok"] for r in reasonableness)
+        and cpu_ok
         else "FAIL"
     )
     OUT_PATH.write_text(json.dumps(report, indent=2))
     print(f"\nSTATUS={report['status']} total_s={report['total_seconds']}", flush=True)
     print(f"Wrote {OUT_PATH}", flush=True)
+    if cpu_cmp and not cpu_cmp.get("skipped"):
+        print(
+            f"CPU compare max_abs={cpu_cmp.get('max_abs_diff')} "
+            f"ok_1e-2={cpu_cmp.get('ok')} ok_1e-1={cpu_cmp.get('ok_loose')}",
+            flush=True,
+        )
     return 0 if report["status"] == "PASS" else 1
 
 

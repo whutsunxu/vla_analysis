@@ -16,6 +16,7 @@ doc/
   cpu/                                # CPU study (operators + report)
   gpu/
     eager_mode/                       # GPU eager-path capture (default product path)
+    compile_mode/                     # GPU torch.compile smoke + report
 src/                                  # inference / profiling harnesses
 ```
 
@@ -55,16 +56,25 @@ Public SmolVLA / LeRobot default is **eager** (`compile_model=False`). All GPU d
 | [`src/smolvla_test_infer.py`](src/smolvla_test_infer.py) | CPU/CUDA `select_action` smoke test + Stage 0–4 timing |
 | [`src/smolvla_profile_detail.py`](src/smolvla_profile_detail.py) | Finer stage / event profiling |
 | [`src/smolvla_aten_profile.py`](src/smolvla_aten_profile.py) | `TorchDispatchMode` ATen chrono → JSON/log |
-| [`src/smolvla_nsight_target.py`](src/smolvla_nsight_target.py) | Nsight Systems capture target (`cudaProfilerStart/Stop`) |
+| [`src/smolvla_compile_graph_dump.py`](src/smolvla_compile_graph_dump.py) | Dump torch.compile FX/AOT graphs → compile_mode op list |
 
 ## Eager vs compile
 
 | Mode | Status in this repo | Notes |
 |------|---------------------|--------|
 | **Eager** (default) | Documented under `doc/gpu/eager_mode/` | Matches Hub / LeRobot default |
-| **`torch.compile`** | Not captured yet | Optional in current LeRobot (`compile_model`, default `False`, mode `max-autotune`). Sibling VLAs (e.g. openpi π₀ PyTorch) often compile `sample_actions` by default |
+| **`torch.compile`** | Documented under `doc/gpu/compile_mode/` | `reduce-overhead` + `max-autotune` both **PASS** vs CPU (≤1e-2); warm ~75–77 ms/chunk |
+
+### GPU — compile mode
+
+| Path | Content |
+|------|---------|
+| [`doc/gpu/compile_mode/smolVLA_compile_mode_report.md`](doc/gpu/compile_mode/smolVLA_compile_mode_report.md) | Compile smoke vs CPU, latency, debug notes |
+| [`doc/gpu/compile_mode/SmolVLA_CompileOp_List_gpu_backend.md`](doc/gpu/compile_mode/SmolVLA_CompileOp_List_gpu_backend.md) | Optimized FX/AOT operator list (compile counterpart of eager AtenOp list) |
+| [`doc/gpu/compile_mode/smolvla_compile_fx_graphs.json`](doc/gpu/compile_mode/smolvla_compile_fx_graphs.json) | Full captured FX graphs |
+| [`smoke_test_report_gpu_compile.json`](smoke_test_report_gpu_compile.json) | Machine-readable `reduce-overhead` smoke result |
 
 ## Status
 
-- **Done:** SmolVLA architecture + CPU report; GPU eager ATen/kernel lists, util/roofline, fusion gap analysis verified from nsys.
-- **Next:** Optional `doc/gpu/compile_mode/` capture; then framework / graph / IR optimizations guided by §11 priorities (RoPE, RMSNorm, eager→Flash, cast/epilogue fold).
+- **Done:** SmolVLA architecture + CPU report; GPU eager ATen/kernel lists, util/roofline, fusion gap analysis; **GPU compile-mode smoke** (`reduce-overhead` / `max-autotune`) verified vs CPU.
+- **Next:** Framework / graph / IR optimizations guided by eager §11 priorities (RoPE, RMSNorm, eager→Flash, cast/epilogue fold); optional Nsight of the compiled graph.
