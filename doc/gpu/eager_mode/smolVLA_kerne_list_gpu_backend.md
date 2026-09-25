@@ -11,9 +11,9 @@
 | Per-launch GPU time | `(end - start)` ns → **µs** (`÷ 1000`), printed to **0.01 µs** |
 | ATen I/O | `SmolVLA_AtenOp_List_gpu_backend.md` / `smolvla_aten_chrono.json` (same stage templates) |
 | **Not** used for launch times | `cuda_gpu_kern_sum` CSV averages |
-| Measured chunk | 3rd inference after 2 warmups (`upsample` @ **540.4229 ms** rel. first CUPTI kernel) |
+| Measured chunk | 3rd inference in the report (after 2 prior full chunks); first `upsample` @ **9.824808 s** absolute (= **540.4229 ms** after first CUPTI kernel) |
 
-**Key-ops utilization summary:** **§9**. **Reusable skill** (rebuild this file): **§10**.
+**Absolute timeline (GUI seconds):** **§0.2**. **Key-ops utilization summary:** **§10**. **Fusion gap benefit:** **§11**. **Reusable skill** (rebuild this file): **§12**.
 
 **Promise:** GPU times are CUPTI `(end-start)` from the `.nsys-rep` export. I/O columns come from matching ATen chrono ops in launch order when possible; otherwise inferred and tagged.
 
@@ -45,7 +45,33 @@ Physical intensity (ridge point) = `Peak FLOP/s ÷ Peak DRAM BW` = `TFLOP/s ÷ 0
 
 **Roofline use with this doc:** compare BF16 CUTLASS/Flash GEMMs to **94.8 TFLOP/s** dense TC (ridge **~211.6** FLOPs/byte; PyTorch path here does **not** use 2:4 sparsity). Compare FP32 SIMT/cuBLASLt/MAGMA GEMMs to **23.7 TFLOP/s** CUDA (ridge **52.9**). Compare copy/cast and low–arithmetic-intensity elementwise to **448 GB/s**. Peaks assume sustained boost; boards may clock lower under power/thermal limits. NVIDIA “AI TOPS” marketing (e.g. 759) is a different sparse low-precision metric — not the BF16 dense peak above.
 
-### 0.2 Theoretical bottleneck analysis (table column)
+### 0.2 Absolute timeline (Nsight GUI / CUPTI `start`)
+
+Nsight Systems GUI plots **absolute** session time (seconds from process / capture clock). CUPTI `start`/`end` in the sqlite export use that same absolute ns clock. Tables elsewhere in this doc historically used **relative** ms:
+
+```text
+t0      = MIN(CUPTI kernel start)     # first GPU kernel in the report
+rel_ms  = (start − t0) / 1e6
+abs_s   = start / 1e9                 # what the GUI shows
+```
+
+For this report: **`t0` = 9.284385 s**. So GUI **~9.2–9.9 s** ≡ doc relative **0–669 ms**. Conversion: `abs_s = 9.284385 + rel_ms/1000`.
+
+#### End-to-end activity (absolute)
+
+| Absolute window | What is running (GPU kernels) |
+|---|---|
+| **0 → ~9.28 s** | **No CUPTI kernels** in the export. Process / Python / model load / host setup (and any work before the first CUDA launch). Matches the long quiet prefix in the Nsight GUI before the dense GPU region. |
+| **9.284385 → 9.696783 s** | **Full inference chunk #1** (same Stage 0→4 structure as the measured chunk). Landmark: first `upsample_bilinear2d` @ **9.284385 s**. ≈13 836 launches, busy Σ ≈57.4 ms. |
+| **9.696783 → 9.824808 s** | **Full inference chunk #2** (repeat). First upsample @ **9.696783 s**. Same launch count / busy as chunk #1. |
+| **9.824808 → 9.953525 s** | **Measured inference chunk #3** — the Stage 0–4 windows in **§1** and all per-template kernel tables below. First upsample @ **9.824808 s**; last kernel end @ **9.953525 s**. Wall ≈ **128.7 ms**. |
+| **after ~9.95 s** | Capture / report ends (no further kernels in this `.nsys-rep`). |
+
+Within **chunk #3** (absolute), stage order is: **Stage 0** prefix embed (images → ViT/connector → **language embed + state Linear + cat → P**) → **Stage 2** prefill → then interleaved **Stage 1** suffix embed and **Stage 3** expert Euler (×`M=10`) → **Stage 4** crop/queue/post. Exact absolute bounds: **§1**. Language/state kernels: **§4**.
+
+**GUI tip:** zoom to **~9.82–9.95 s** for the analyzed chunk; **~9.28–9.82 s** are the two prior full passes (same shape, not tabulated in detail here).
+
+### 0.3 Theoretical bottleneck analysis (table column)
 
 Stage tables report **IO Volume /GB**, **BD /GB/s**, **BD util ratio**, **GFLOPs**, **GFLOPs/sec**, **FLOPs util ratio**, **Arithmetic intensity (FLOP/byte)**, and **Theoretical bottleneck**. Bottleneck labels are **not** taken from measured CUPTI time; they are a **roofline latency estimate** from algorithmic work vs §0.1 peaks. **BD** / **GFLOPs/sec** / util columns use measured CUPTI **GPU time per launch**.
 
@@ -116,30 +142,34 @@ On exact ties, prefer `2D-calc-bounded` > `1D-calc-bounded` > `calc-bounded` > `
 
 ## 1. Stage durations (measured chunk)
 
-| Stage | Wall-span (ms) | Busy Σ launches (ms) | Gap (ms) | **Gap ratio** | # launches | Rel. window (ms) |
-|---|---:|---:|---:|---:|---:|---|
-| 0 — prefix embed | 24.500 | 22.558 | 1.942 | **7.9%** | 684 | `540.4229→564.9230` |
-| 2 — prefill | 9.741 | 5.263 | 4.478 | **46.0%** | 1232 | `564.9483→574.6896` |
-| 1 — suffix embed (×10 Euler) | 85.225 | 1.162 | 84.063 | **98.6%** † | 360 | `574.7472→659.9726` |
-| 3 — expert decode (×10 Euler) | 94.013 | 28.372 | 65.641 | **69.8%** † | 11560 | `575.1260→669.1395` |
-| 4 — crop/queue/post (tail) | 0.051 | 0.009 | 0.042 | **82.4%** | 5 | `669.0888→669.1395` |
-| Measured chunk (0→4) | 128.717 | 57.355 | 71.362 | **55.4%** | 13836 | `540.4229→669.1395` |
+| Stage | Wall-span (ms) | Busy Σ launches (ms) | Gap (ms) | **Gap ratio** | # launches | Absolute window (s) | Rel. window (ms, vs `t0`) |
+|---|---:|---:|---:|---:|---:|---|---|
+| 0 — prefix embed | 24.500 | 22.558 | 1.942 | **7.9%** | 684 | `9.824808→9.849308` | `540.4229→564.9230` |
+| 2 — prefill | 9.741 | 5.263 | 4.478 | **46.0%** | 1232 | `9.849334→9.859075` | `564.9483→574.6896` |
+| 1 — suffix embed (×10 Euler) | 85.225 | 1.162 | 84.063 | **98.6%** † | 360 | `9.859133→9.944358` | `574.7472→659.9726` |
+| 3 — expert decode (×10 Euler) | 94.013 | 28.372 | 65.641 | **69.8%** † | 11560 | `9.859511→9.953525` | `575.1260→669.1395` |
+| 4 — crop/queue/post (tail) | 0.051 | 0.009 | 0.042 | **82.4%** | 5 | `9.953474→9.953525` | `669.0888→669.1395` |
+| Measured chunk (0→4) | 128.717 | 57.355 | 71.362 | **55.4%** | 13836 | `9.824808→9.953525` | `540.4229→669.1395` |
+
+Absolute windows use CUPTI `start/end` ÷ `1e9` (same axis as Nsight GUI). Rel. window = absolute − **`t0` = 9.284385 s** (first CUPTI kernel); see **§0.2**.
 
 Gap = wall-span − busy Σ; **gap ratio** = gap ÷ wall-span (share of the window not covered by summed kernel runtimes; ≈ inter-launch idle under single-stream serial launch).
 
 † Stages **1** and **3** wall-spans **overlap** (Euler interleaving), so their gap ratios are **inflated** — each window includes long stretches while the other stage runs. Prefer the per-template blurbs below (first Euler / first layer) for a cleaner gap read. Busy Σ can still be added across 1+3.
 
-Kernel tables below: **first** repeated unit only (first ViT layer, first Euler Stage 1, first prefill layer, first expert **even** layer, first expert **odd** / cross-attn layer).
+Kernel tables below: Stage 0 prepare + **first** ViT block + **language/state/prefix assembly** (once); then first Euler Stage 1, first prefill layer, first expert **even** / **odd** layer.
 
 Column layout: `| Order | Operator | Input | Output | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |`
 
-Metric definitions and the **Theoretical bottleneck** latency-argmax rule: **§0.2**.
+Metric definitions and the **Theoretical bottleneck** latency-argmax rule: **§0.3**. Absolute vs relative time: **§0.2**.
 
 ## 2. Stage 0 — prepare / patch (before first ViT LayerNorm)
 
 Cross-ref: ATen §1.0 `prepare_images` (×3 cams) + §1.1 patch/pos until first ViT LN.
 
-Launches **54**, busy Σ **409.35 µs**, window `540.4229→541.1335 ms`. ATen-matched **6/54**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype.
+**Timeline (measured chunk #3):** absolute **`9.824808→9.825519 s`** (rel `540.4229→541.1335 ms`). **Repeat:** `prepare_images` + patch/pos path **×`C=3` cameras** / chunk (table = **first** camera through first ViT LN).
+
+Launches **54**, busy Σ **409.35 µs**. ATen-matched **6/54**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype.
 
 **Metrics columns (this stage):** IO / GFLOPs / AI filled from shapes + semantics (CPU-list conventions: bilinear = 7 Basic/out; MAC = 2×K; cast/copy/index/gather = 0 FLOPs). Position-ID I/O uses Aten-aligned shapes (table Input/Output corrected where the prior inferred shapes were wrong). Patch Conv lists **2D** MAC (BF16); following Add is **1D** bias (BF16). **Theoretical bottleneck:** latency argmax `time_2D` / `time_1D` / `time_bd` (§0 peaks). Patch Conv is **2D-only** (bias is the next Add row).
 
@@ -204,7 +234,9 @@ Launches **54**, busy Σ **409.35 µs**, window `540.4229→541.1335 ms`. ATen-m
 
 Cross-ref: ATen §1.2 first encoder block (`#46–65`). Flash ≡ `scaled_dot_product_attention`.
 
-Launches **14**, busy Σ **594.72 µs**, window `541.1343→541.7640 ms`. ATen-matched **10/14**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks; 1D only if real bias/1D epilogue).
+**Timeline (measured chunk #3):** absolute **`9.825520→9.826149 s`** (rel `541.1343→541.7640 ms`). **Repeat:** ViT encoder block **×`L_v=12` / camera × `C=3` cameras → 36 blocks / chunk** (table = **cam0, block0** only). Connector + PixelShuffle path after each camera’s 12 blocks is not expanded here.
+
+Launches **14**, busy Σ **594.72 µs**. ATen-matched **10/14**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks / §0.3; 1D only if real bias/1D epilogue).
 
 | Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
 |---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
@@ -223,11 +255,41 @@ Launches **14**, busy Σ **594.72 µs**, window `541.1343→541.7640 ms`. ATen-m
 | 13 | Add (residual) *[no aten]* | (inferred) [1,1024,768] bf16 | (inferred) [1,1024,768] bf16 | 0.004719 | 214.7 | 47.9% | 7.86e-04 (BF16) | 35.76 | 0.038% | 0.167 | bd-bounded | **21.98 µs** | `void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::CUDAFunctor_add<c10::BFloat16>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)` |
 | 14 | Copy (between blocks / dtype) *[no aten]* | (inferred) [1,1024,768] bf16 | (inferred) [1,1024,768] bf16 | 0.003146 | 153.6 | 34.3% | 0 | 0 | — | — | bd-bounded | **20.48 µs** | `void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 12)]::operator ()() const::[lambda(c10::BFloat16) (instance 1)]>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)` |
 
-## 4. Stage 1 — first Euler step
+## 4. Stage 0 — language + state + prefix assembly
+
+Cross-ref: ATen §1.4 `#892–901` (after ×3 camera ViT+connector). These are **not** a separate §1 wall-stage — they are the **tail of Stage 0** (prefix embed), immediately before Stage 2 prefill.
+
+**Timeline (measured chunk #3):** absolute **`9.849008→9.849206 s`** (rel `564.6224→564.8203 ms`). **Repeat:** **1× / chunk** (language embed + state Linear + cat → prefix `P`).
+
+Launches **17**, busy Σ **25.28 µs**. ATen-matched **2/17**; unmatched rows tagged *[no aten]*. **Metrics:** like §2 (§0.3).
+
+| Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
+|---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
+| 1 | Language embedding (gather) | [49280,960] bf16 × ids [1,48] int64 | [1,48,960] bf16 | 0.000185 | 128.3 | 28.6% | 0 | 0 | — | — | bd-bounded | **1.44 µs** | `void at::native::vectorized_gather_kernel<(int)16, long>(char *, char *, T2 *, int, long, long, long, long, bool)` |
+| 2 | Mul (×√960) *[no aten]* | (inferred) [1,48,960] bf16 | (inferred) [1,48,960] bf16 | 0.000184 | 221.5 | 49.5% | 4.61e-05 (BF16) | 55.385 | 0.058% | 0.250 | bd-bounded | **0.83 µs** | `void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<c10::BFloat16, c10::BFloat16, c10::BFloat16, at::native::binary_internal::MulFunctor<float>>, std::array<char *, (unsigned long)2>>(int, T2, T3)` |
+| 3 | State Linear 32→960 (gemvx) | [1,32] float32 × [960,32] float32 × [960] float32 | [1,960] float32 | 0.000131 | 55.95 | 12.5% | 2D 0.0001 (FP32) + 1D 9.60e-07 (FP32) | 26.712 | 0.113% | 2D 0.47; 1D 0.007 | bd-bounded | **2.34 µs** | `std::enable_if<!T7, void>::type internal::gemvx::kernel<int, int, float, float, float, float, (bool)0, (bool)1, (bool)1, (bool)0, (int)5, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<float>, float>>(T13)` |
+| 4 | Fill mask (bool) *[no aten]* | (inferred) [1,1] bool | (inferred) [1,1] bool | 1.00e-09 | 1.30e-03 | 0.000% | 0 | 0 | — | — | bd-bounded | **0.77 µs** | `void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<bool>, std::array<char *, (unsigned long)1>>(int, T2, T3)` |
+| 5 | Cast (cam token → FP32 for cat) *[no aten]* **[dtype≠aten]** | (inferred) ⚠ [1,64,960] bf16→float32 | (inferred) ⚠ [1,64,960] float32 | 0.000369 | 134.0 | 29.9% | 0 | 0 | — | — | bd-bounded | **2.75 µs** | `void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)` |
+| 6 | Cast (cam token → FP32 for cat) *[no aten]* **[dtype≠aten]** | (inferred) ⚠ [1,64,960] bf16→float32 | (inferred) ⚠ [1,64,960] float32 | 0.000369 | 137.1 | 30.6% | 0 | 0 | — | — | bd-bounded | **2.69 µs** | `void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)` |
+| 7 | Cast (cam token → FP32 for cat) *[no aten]* **[dtype≠aten]** | (inferred) ⚠ [1,64,960] bf16→float32 | (inferred) ⚠ [1,64,960] float32 | 0.000369 | 217.4 | 48.5% | 0 | 0 | — | — | bd-bounded | **1.70 µs** | `void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)` |
+| 8 | Cast (lang → FP32 for cat) *[no aten]* **[dtype≠aten]** | (inferred) ⚠ [1,48,960] bf16→float32 | (inferred) ⚠ [1,48,960] float32 | 0.000276 | 166.2 | 37.1% | 0 | 0 | — | — | bd-bounded | **1.66 µs** | `void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 7)]::operator ()() const::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)` |
+| 9 | Cat → prefix P *[no aten]* | (inferred) 3×[1,64,960]+[1,48,960]+[1,1,960] float32 | (inferred) [1,241,960] float32 | 0.001851 | 1180.4 | 263% ⚠L2/cache·algo-IO≠DRAM | 0 | 0 | — | — | bd-bounded | **1.57 µs** | `void at::native::<unnamed>::CatArrayBatchedCopy<at::native::<unnamed>::OpaqueType<(unsigned int)1>, unsigned int, (int)2, (int)64, (int)64>(T1 *, at::native::<unnamed>::CatArrInputTensorMetadata<T1, T2, T4, T5>, at::native::<unnamed>::TensorSizeStride<T2, (unsigned int)4>, int, T2)` |
+| 10 | Cast / copy (mask path) *[no aten]* | (inferred) mask | (inferred) mask | 3.86e-06 | 2.739 | 0.611% | 0 | 0 | — | — | bd-bounded | **1.41 µs** | `void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)` |
+| 11 | CUB scan init — mask *[no aten]* | (inferred) scan state | (inferred) scan state | 6.40e-08 | 0.0870 | 0.019% | 0 | 0 | — | — | bd-bounded | **0.74 µs** | `void at_cuda_detail::cub::DeviceScanInitKernel<at_cuda_detail::cub::ScanTileState<long, (bool)1>>(T1, int)` |
+| 12 | CUB scan — mask *[no aten]* | (inferred) [241] int64 | (inferred) [241] int64 | 3.86e-06 | 2.802 | 0.626% | 2.41e-07 (FP32) | 0.1751 | 0.000% | 0.062 | bd-bounded | **1.38 µs** | `void at_cuda_detail::cub::DeviceScanKernel<at_cuda_detail::cub::DeviceScanPolicy<long, std::plus<long>>::Policy900, const long *, long *, at_cuda_detail::cub::ScanTileState<long, (bool)1>, std::plus<long>, at_cuda_detail::cub::NullType, unsigned int, long, (bool)0>(T2, T3, T4, int, T5, T6, T7)` |
+| 13 | Compare (mask) *[no aten]* | (inferred) [1,241] int64 | (inferred) [1,241] bool | 2.17e-06 | 1.474 | 0.329% | 2.41e-07 (FP32) | 0.1637 | 0.000% | 0.111 | bd-bounded | **1.47 µs** | `void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::<unnamed>::CompareFunctor<long>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)` |
+| 14 | Mul (mask bool) *[no aten]* | (inferred) [1,241] bool × [1,241] bool | (inferred) [1,241] bool | 7.23e-07 | 0.5511 | 0.123% | 2.41e-07 (FP32) | 0.1837 | 0.000% | 0.333 | bd-bounded | **1.31 µs** | `void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<bool, bool, bool, at::native::binary_internal::MulFunctor<bool>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)` |
+| 15 | BitwiseAnd (mask) *[no aten]* | (inferred) [1,241] bool × [1,241] bool | (inferred) [1,241] bool | 7.23e-07 | 0.5793 | 0.129% | 2.41e-07 (FP32) | 0.1931 | 0.000% | 0.333 | bd-bounded | **1.25 µs** | `void at::native::vectorized_elementwise_kernel<(int)4, at::native::BinaryFunctor<bool, bool, bool, at::native::BitwiseAndFunctor<bool>>, std::array<char *, (unsigned long)3>>(int, T2, T3)` |
+| 16 | Cast / copy (mask path) *[no aten]* | (inferred) mask | (inferred) mask | 3.86e-06 | 3.090 | 0.690% | 0 | 0 | — | — | bd-bounded | **1.25 µs** | `void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambda() (instance 4)]::operator ()() const::[lambda(long) (instance 1)], std::array<char *, (unsigned long)2>, (int)4, TrivialOffsetCalculator<(int)1, unsigned int>, TrivialOffsetCalculator<(int)1, unsigned int>, at::native::memory::LoadWithCast<(int)1>, at::native::memory::StoreWithCast<(int)1>>(int, T1, T2, T4, T5, T6, T7)` |
+| 17 | CUB scan init — mask *[no aten]* | (inferred) scan state | (inferred) scan state | 6.40e-08 | 0.0870 | 0.019% | 0 | 0 | — | — | bd-bounded | **0.74 µs** | `void at_cuda_detail::cub::DeviceScanInitKernel<at_cuda_detail::cub::ScanTileState<long, (bool)1>>(T1, int)` |
+
+## 5. Stage 1 — first Euler step
 
 Cross-ref: ATen §2.1 `#1–27` (one Euler step).
 
-Launches **36**, busy Σ **115.49 µs**, window `574.7472→575.0896 ms`. ATen-matched **8/36**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks; 1D only if real bias/1D epilogue).
+**Timeline (measured chunk #3):** absolute **`9.859133→9.859475 s`** (rel `574.7472→575.0896 ms`) — **first** Euler suffix-embed. Full Stage‑1 wall in §1 spans `9.859133→9.944358 s` while Euler steps interleave with Stage 3. **Repeat:** **×`M=10` Euler steps / chunk** (table = Euler step 0 only).
+
+Launches **36**, busy Σ **115.49 µs**. ATen-matched **8/36**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks / §0.3; 1D only if real bias/1D epilogue).
 
 | Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
 |---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
@@ -268,11 +330,13 @@ Launches **36**, busy Σ **115.49 µs**, window `574.7472→575.0896 ms`. ATen-m
 | 35 | Add — Stage-1 helper *[no aten]* | (inferred) [1,50,720] float32 | (inferred) [1,50,720] float32 | 8.00e-07 | 0.9302 | 0.208% | 5.00e-08 (INT64) | 0.0581 | 0.000% | 0.062 | bd-bounded | **0.86 µs** | `void at::native::elementwise_kernel<(int)128, (int)2, void at::native::gpu_kernel_impl_nocast<at::native::CUDAFunctor_add<long>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)` |
 | 36 | Add — Stage-1 helper *[no aten]* | (inferred) [1,50,720] float32 | (inferred) [1,50,720] float32 | 8.00e-07 | 0.8889 | 0.198% | 5.00e-08 (INT64) | 0.0556 | 0.000% | 0.062 | bd-bounded | **0.90 µs** | `void at::native::vectorized_elementwise_kernel<(int)2, at::native::CUDAFunctorOnSelf_add<long>, std::array<char *, (unsigned long)2>>(int, T2, T3)` |
 
-## 5. Stage 2 — first prefill layer
+## 6. Stage 2 — first prefill layer
 
 Cross-ref: ATen §3.2 `#11–127` (one of `L_p=16`).
 
-Launches **77**, busy Σ **331.46 µs**, window `564.9483→565.6803 ms`. ATen-matched **19/77**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks; 1D only if real bias/1D epilogue).
+**Timeline (measured chunk #3):** absolute **`9.849334→9.850066 s`** (rel `564.9483→565.6803 ms`) — **first** prefill layer. Full Stage‑2 wall in §1: `9.849334→9.859075 s`. **Repeat:** VLM prefill layer **×`L_p=16` / chunk** (table = layer 0 only).
+
+Launches **77**, busy Σ **331.46 µs**. ATen-matched **19/77**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks / §0.3; 1D only if real bias/1D epilogue).
 
 | Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
 |---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
@@ -354,11 +418,13 @@ Launches **77**, busy Σ **331.46 µs**, window `564.9483→565.6803 ms`. ATen-m
 | 76 | Cast (attn/RoPE dtype path) *[no aten]* | (inferred) [1,241,960] float32 | (inferred) [1,241,960] float32 | 0.001851 | 1381.3 | 308.3% ⚠inferred-oversize-IO | 0 | 0 | — | — | bd-bounded | **1.34 µs** | `void at::native::vectorized_elementwise_kernel<(int)4, at::native::bfloat16_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda(float) (instance 1)], std::array<char *, (unsigned long)2>>(int, T2, T3)` |
 | 77 | Mul (RoPE apply) *[no aten]* | (inferred) [1,241,960] float32 | (inferred) [1,241,960] float32 | 0.001388 | 504.7 | 112.7% ⚠L2/cache·algo-IO≠DRAM | 2.31e-04 (BF16) | 84.00 | 0.089% | 0.167 | bd-bounded | **2.75 µs** | `void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<c10::BFloat16, c10::BFloat16, c10::BFloat16, at::native::binary_internal::MulFunctor<float>>>(at::TensorIteratorBase &, const T1 &)::[lambda(int) (instance 1)]>(int, T3)` |
 
-## 6. Stage 3 — first expert layer (Euler 0, even)
+## 7. Stage 3 — first expert layer (Euler 0, even)
 
-Cross-ref: ATen §4.2 `#17–131` (even self-attn). Trailing pre-attn RMSNorm of the next (odd) layer is in **§7**, not here.
+Cross-ref: ATen §4.2 `#17–131` (even self-attn). Trailing pre-attn RMSNorm of the next (odd) layer is in **§8**, not here.
 
-Launches **77**, busy Σ **175.71 µs**, window `575.1260→575.7792 ms`. ATen-matched **22/77**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks; 1D only if real bias/1D epilogue).
+**Timeline (measured chunk #3):** absolute **`9.859511→9.860165 s`** (rel `575.1260→575.7792 ms`) — **first** even expert layer (Euler 0). Full Stage‑3 wall in §1: `9.859511→9.953525 s` (overlaps Stage 1). **Repeat:** even self-attn expert layer **×`8` / Euler step × `M=10` → 80 / chunk** (table = Euler 0, even layer 0).
+
+Launches **77**, busy Σ **175.71 µs**. ATen-matched **22/77**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks / §0.3; 1D only if real bias/1D epilogue).
 
 | Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
 |---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
@@ -440,11 +506,13 @@ Launches **77**, busy Σ **175.71 µs**, window `575.1260→575.7792 ms`. ATen-m
 | 76 | cuBLASLt splitK reduce — Stage-3 helper *[no aten]* | (inferred) [1,50,720] bf16 | (inferred) [1,50,720] bf16 | 0.000144 | 60.00 | 13.4% | 1D 3.60e-05 (BF16) | 15.00 | 0.063% | 0.250 | bd-bounded | **2.40 µs** | `void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, __nv_bfloat16, __nv_bfloat16, float, __nv_bfloat16, (bool)0, __nv_bfloat16, __nv_bfloat16, __nv_bfloat16, (bool)1, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)` |
 | 77 | Add (residual) *[no aten]* | (inferred) [1,50,720] bf16 | (inferred) [1,50,720] bf16 | 0.000216 | 251.2 | 56.1% | 3.60e-05 (BF16) | 41.86 | 0.044% | 0.167 | bd-bounded | **0.86 µs** | `void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::BFloat16>, std::array<char *, (unsigned long)3>>(int, T2, T3)` |
 
-## 7. Stage 3 — first expert layer (Euler 0, odd / cross-attn)
+## 8. Stage 3 — first expert layer (Euler 0, odd / cross-attn)
 
-Cross-ref: ATen §4.3 `#132–222` (odd cross-attn). Differs from §6 even: **no** suffix K/V Linears / KV-cat; **Cross-K/V** `320→320` **FP32** on prefix len **241**; RoPE on **Q only**; scores `[…,50,241]`; Softmax `(int)8`; **A·V is FP32** (`simt_sgemm` nn), not bf16 CUTLASS.
+Cross-ref: ATen §4.3 `#132–222` (odd cross-attn). Differs from §7 even: **no** suffix K/V Linears / KV-cat; **Cross-K/V** `320→320` **FP32** on prefix len **241**; RoPE on **Q only**; scores `[…,50,241]`; Softmax `(int)8`; **A·V is FP32** (`simt_sgemm` nn), not bf16 CUTLASS.
 
-Launches **65**, busy Σ **179.55 µs**, window `575.7808→576.2973 ms`. ATen-matched **20/65**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks; 1D only if real bias/1D epilogue).
+**Timeline (measured chunk #3):** absolute **`9.860166→9.860683 s`** (rel `575.7808→576.2973 ms`) — **first** odd expert layer (Euler 0). **Repeat:** odd cross-attn expert layer **×`8` / Euler step × `M=10` → 80 / chunk** (table = Euler 0, odd layer 0).
+
+Launches **65**, busy Σ **179.55 µs**. ATen-matched **20/65**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks / §0.3; 1D only if real bias/1D epilogue).
 
 | Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
 |---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
@@ -514,11 +582,13 @@ Launches **65**, busy Σ **179.55 µs**, window `575.7808→576.2973 ms`. ATen-m
 | 64 | cuBLASLt splitK reduce (bf16) *[no aten]* | (inferred) [1,50,720] bf16 | (inferred) [1,50,720] bf16 | 0.000144 | 59.26 | 13.2% | 1D 3.60e-05 (BF16) | 14.81 | 0.063% | 0.25 | bd-bounded | **2.43 µs** | `void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, __nv_bfloat16, __nv_bfloat16, float, __nv_bfloat16, (bool)0, __nv_bfloat16, __nv_bfloat16, __nv_bfloat16, (bool)1, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)` |
 | 65 | Add (residual) *[no aten]* | (inferred) [1,50,720] bf16 × [1,50,720] bf16 | (inferred) [1,50,720] bf16 | 0.000216 | 251.2 | 56.1% | 3.60e-05 (BF16) | 41.86 | 0.044% | 0.167 | bd-bounded | **0.86 µs** | `void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctor_add<c10::BFloat16>, std::array<char *, (unsigned long)3>>(int, T2, T3)` |
 
-## 8. Stage 4 — post-Euler tail
+## 9. Stage 4 — post-Euler tail
 
 Cross-ref: ATen §5.1 `#1–5` (mostly view/slice; few CUPTI kernels).
 
-Launches **5**, busy Σ **9.44 µs**, window `669.0888→669.1395 ms`. ATen-matched **0/5**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks; 1D only if real bias/1D epilogue).
+**Timeline (measured chunk #3):** absolute **`9.953474→9.953525 s`** (rel `669.0888→669.1395 ms`) — chunk-fill tail / crop–queue–post. **Repeat:** **1×** at end of this capture’s chunk fill (production also runs per `select_action` pop; wall ≪ Stages 0–3).
+
+Launches **5**, busy Σ **9.44 µs**. ATen-matched **0/5**; unmatched rows tagged *[no aten]* with *(inferred)* I/O from role defaults or upstream/downstream. Mark **[dtype≠aten]** = kernel template dtype disagrees with ATen chrono dtype; I/O then uses the **kernel** dtype. **Metrics:** IO / GFLOPs / AI / Theoretical bottleneck like §2 (latency argmax vs §0.1 peaks / §0.3; 1D only if real bias/1D epilogue).
 
 | Order | Operator | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | Kernel |
 |---:|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|
@@ -530,28 +600,28 @@ Launches **5**, busy Σ **9.44 µs**, window `669.0888→669.1395 ms`. ATen-matc
 
 ---
 
-## 9. Summary — key ops utilization and perf potential
+## 10. Key kernels — key ops utilization and perf potential
 
-Scope: **first-template** tables in this doc (§2–§8), not full-chunk × repeats. Metrics = measured CUPTI time vs §0.1 peaks (§0.2). **FLOPs util** and **BD util** are algorithmic; BD util ≥100% is tagged in the tables (`⚠…`) and is **not** real DRAM > peak.
+Scope: **first-template** tables in this doc (§2–§9), not full-chunk × repeats. Metrics = measured CUPTI time vs §0.1 peaks (§0.3). **FLOPs util** and **BD util** are algorithmic; BD util ≥100% is tagged in the tables (`⚠…`) and is **not** real DRAM > peak.
 
 Peaks used: BF16 Tensor Core **94.8 TFLOP/s**, CUDA/FP32 **23.7 TFLOP/s**, DRAM **448 GB/s**.
 
-### 9.1 Snapshot table
+### 10.1 Snapshot table
 
 | Family | Where (examples) | Typical GPU time | FLOPs util | BD util | Theoretical bottleneck | Perf potential |
 |---|---|---:|---:|---:|---|---|
 | **Convolution** | §2 Patch Conv `#15` | **199 µs** (heaviest single launch in templates) | **~6.4%** TC | ~5% | **2D-calc-bounded** | Already compute-bound at low TC util — room via better conv algo / larger tiles / fused bias; bias is a separate Add today |
 | **Linear (ViT, large M)** | §3 Q/K/V/out, MLP up/down | 31–153 µs | **~33–42%** TC | ~18–31% | **2D-calc-bounded** | Best GEMM efficiency in this capture; further gains = epilogue fusion (bias/GELU/residual), QKV pack |
-| **Linear (prefill)** | §5 Q / attn-out / MLP | 11–41 µs | **~14–37%** TC | ~24–44% | **bd-bounded** | Memory-lean shapes (seq 241); fuse SiLU×mul into SwiGLU; pack QKV; expect util↑ if AI↑ (longer seq / fused) |
-| **Linear (expert even/odd)** | §6–§7 Q, attn-out, MLP, Cross-K/V | 7–16 µs | **~10–15%** (BF16 TC or FP32 CUDA) | ~15–70% | **bd-bounded** | Short seq **50** → bandwidth-bound; Cross-K/V **FP32 SIMT** (~13% of 23.7) especially weak vs bf16 TC — cast+TC or fused cross-attn |
-| **Linear (Stage 1 fusion)** | §4 mid/out FP32 | 23–39 µs | **~9–11%** CUDA | ~23–26% | **bd-bounded** | Small FP32 GEMMs; fuse SiLU; consider bf16 TC path if numerically OK |
-| **MatMul (eager attn)** | §5/§6/§7 `QKᵀ`, `A·V` | 7–21 µs | **~4–22%** | ~35–62% | **bd-bounded** | Unfused magma/CUTLASS/SIMT; replace with **SDPA/Flash** (see ViT); odd `A·V` stays FP32 (~10% CUDA) |
+| **Linear (prefill)** | §6 Q / attn-out / MLP | 11–41 µs | **~14–37%** TC | ~24–44% | **bd-bounded** | Memory-lean shapes (seq 241); fuse SiLU×mul into SwiGLU; pack QKV; expect util↑ if AI↑ (longer seq / fused) |
+| **Linear (expert even/odd)** | §7–§8 Q, attn-out, MLP, Cross-K/V | 7–16 µs | **~10–15%** (BF16 TC or FP32 CUDA) | ~15–70% | **bd-bounded** | Short seq **50** → bandwidth-bound; Cross-K/V **FP32 SIMT** (~13% of 23.7) especially weak vs bf16 TC — cast+TC or fused cross-attn |
+| **Linear (Stage 1 fusion)** | §5 mid/out FP32 | 23–39 µs | **~9–11%** CUDA | ~23–26% | **bd-bounded** | Small FP32 GEMMs; fuse SiLU; consider bf16 TC path if numerically OK |
+| **MatMul (eager attn)** | §6/§7/§8 `QKᵀ`, `A·V` | 7–21 µs | **~4–22%** | ~35–62% | **bd-bounded** | Unfused magma/CUTLASS/SIMT; replace with **SDPA/Flash** (see ViT); odd `A·V` stays FP32 (~10% CUDA) |
 | **Attention (fused)** | §3 FlashAttention `#5` | **83 µs** | **~42%** TC | ~17% | **2D-calc-bounded** | Reference pattern for Stage 2/3 — highest “attention” compute efficiency here |
-| **Softmax** | §5/§6/§7 standalone | 2–6 µs | **~1.7–2.9%** CUDA | ⚠ **138–247%** | **bd-bounded** | Tiny vs GEMMs; BD util nonsense (L2/algo-IO). Win = **fuse into Flash/SDPA** (eliminate launch), not micro-optimizing softmax |
-| **RMSNorm** | §5–§7 many tiny kernels | ~0.8–3 µs each (chain Σ small) | **≪1%** | often high / ⚠ | **bd-bounded** | Unfused `pow/mean/add/rsqrt/mul/cast` — fuse to one `rms_norm` kernel (ViT already uses fused **LayerNorm**) |
+| **Softmax** | §6/§7/§8 standalone | 2–6 µs | **~1.7–2.9%** CUDA | ⚠ **138–247%** | **bd-bounded** | Tiny vs GEMMs; BD util nonsense (L2/algo-IO). Win = **fuse into Flash/SDPA** (eliminate launch), not micro-optimizing softmax |
+| **RMSNorm** | §6–§8 many tiny kernels | ~0.8–3 µs each (chain Σ small) | **≪1%** | often high / ⚠ | **bd-bounded** | Unfused `pow/mean/add/rsqrt/mul/cast` — fuse to one `rms_norm` kernel (ViT already uses fused **LayerNorm**) |
 | **LayerNorm** | §3 ViT `#1`,`#9` | **8.2 µs** ×2 | **~2.8%** CUDA | ~86% | **bd-bounded** | Already **one** fused kernel; low FLOPs util is expected (norm is memory-ish). Little upside beyond staying fused |
 
-### 9.2 Family notes
+### 10.2 Family notes
 
 #### Convolution
 Single Patch Conv dominates Stage‑0 prepare time among templates (**~199 µs**, AI≈279 → 2D-calc-bounded) but only **~6%** of BF16 TC peak — large theoretical headroom if the implementation or autotuning improves; not a DRAM story.
@@ -566,23 +636,24 @@ Clear **size / AI split**:
 Eager `QKᵀ`/`A·V` (+ `where` + Softmax) are **bd-bounded** at **~4–22%** FLOPs util. ViT **Flash** is **2D-calc-bounded** at **~42%** TC util. Largest Stage‑2/3 win: **eager → SDPA/Flash** (also drops Softmax/where launches).
 
 #### Softmax
-FLOPs util negligible; BD util >100% = algo-IO / L2 (§0.2 ⚠). Treat as fusion fodder, not a bandwidth-tuning target.
+FLOPs util negligible; BD util >100% = algo-IO / L2 (§0.3 ⚠). Treat as fusion fodder, not a bandwidth-tuning target.
 
 #### RMSNorm vs LayerNorm
 RMSNorm = many launches, ≪1% FLOPs util, often ⚠ BD. LayerNorm = fused, still bd-bounded at ~3% FLOPs / ~86% BD model. Prefer **one fused RMSNorm** matching the ViT LN pattern.
 
-### 9.3 Priority reading (perf potential)
+### 10.3 Priority reading (perf potential)
 
-| Priority | Action | Why (from this capture) |
-|---|---|---|
-| **P0** | Stage 2/3 eager attn → Flash/SDPA | Flash already **~42%** TC & 2D-bound; eager matmul/softmax are bd-bound & fragmented |
-| **P0** | Fuse RMSNorm chains | Dozens of sub‑µs–few‑µs launches; ViT LN shows fused is available |
-| **P1** | Expert Cross-K/V off FP32 SIMT | ~15 µs ×2 / odd layer at ~13% CUDA; odd `A·V` FP32 similar |
-| **P1** | SwiGLU / residual epilogues on MLP Linears | Prefill/expert MLP already mid util but still bd-bound + separate SiLU/mul |
-| **P2** | Patch Conv algorithm / fusion | Longest single template launch but only ~6% TC — worth tuning if Stage 0 wall matters |
-| **P2** | Pack QKV Linears | Three similar GEMMs per layer (ViT/prefill/expert) |
+| Priority | Action | Why (from this capture) | Gap benefit (§11) |
+|---|---|---|---:|
+| **P0** | Fuse **RoPE** chains | ~41 tiny launches/layer; ~80% of RoPE wall is inter-kernel idle | **≈31.2 ms** |
+| **P0** | Fuse **RMSNorm** chains | 7 launches/norm; ViT LN already fused; ~75–80% idle in chain | **≈11.1 ms** |
+| **P1** | Stage 2/3 eager attn → Flash/SDPA | Flash already **~42%** TC & 2D-bound; eager fragmented (+ busy win beyond gaps) | **≈4.9 ms** |
+| **P1** | Expert Cross-K/V off FP32 SIMT | ~15 µs ×2 / odd layer at ~13% CUDA; odd `A·V` FP32 similar | (busy, not gap) |
+| **P2** | SwiGLU / residual epilogues on MLP Linears | Separate SiLU/mul; gap small vs GEMM busy | **≈1.9 ms** |
+| **P2** | Patch Conv algorithm / fusion | Longest single template launch but only ~6% TC | — |
+| **P2** | Pack QKV Linears | Three similar GEMMs per layer (ViT/prefill/expert) | — |
 
-### 9.4 How to read util here
+### 10.4 How to read util here
 
 - **High FLOPs util + 2D-calc-bounded** (ViT Linear / Flash) → compute-limited; optimize algo / fusion / occupancy.
 - **Low–mid FLOPs util + bd-bounded** (expert Linear, eager matmul) → feed more math per byte (fuse, longer effective K, fewer launches) or cut traffic.
@@ -590,11 +661,146 @@ RMSNorm = many launches, ≪1% FLOPs util, often ⚠ BD. LayerNorm = fused, stil
 
 ---
 
-## 10. Skill — produce a GPU kernel list for any inference path
+---
+
+## 11. Potential fusion analysis (kernel chains → gap benefit)
+
+Cross-check **Nsight CUPTI launches** (this doc §2–§9) against **AtenOp fusion candidates** (`SmolVLA_AtenOp_List_gpu_backend.md` **§6**). Goal: which **adjacent kernel chains** could collapse into **one** fused launch, and how much **idle time between those kernels** that fusion would omit.
+
+Legend: **Today** = what this capture already does; **Potential** = fused rewrite / Inductor / custom kernel; **Gap benefit** = Σ positive inter-kernel idle in the chain (see §11.0), scaled by template repeats — **not** the busy Σ of the kernels themselves.
+
+### 11.0 How gap benefit is measured (nsys-rep / CUPTI)
+
+Source: `doc/gpu/nsight/smolvla_nsys.sqlite` (`CUPTI_ACTIVITY_KIND_KERNEL`), measured chunk #3 templates (§1 windows).
+
+For a contiguous ordered chain \(K_0,\ldots,K_{n-1}\):
+
+```text
+busy_µs       = Σ (end_i − start_i) / 1e3
+gap_µs        = Σ max(0, start_{i+1} − end_i) / 1e3   # idle between launches
+wall_µs       = (end_{n-1} − start_0) / 1e3
+gap_benefit   = gap_µs × repeat_count / 1e3            # → ms / chunk
+```
+
+**Interpretation:** Ideal fusion to **one** launch removes **\(n-1\)** inter-launch gaps → save ≈ **gap_benefit**. The fused kernel still executes roughly the same math/bytes (**busy** remains unless the *algorithm* also improves, e.g. Flash vs eager). This section’s tables lead with **gap-only** savings. **Exception — §11.4:** when transpose/expand are views (**gap ≈ 0**), fusion can still cut **prologue/epilogue kernel busy** (cast/copy/`splitK` folded into the GEMM) — that busy-fold benefit is called out there separately.
+
+**Repeats used (chunk #3):** Prefill layers **×16**; even/odd expert layers **×80** (= 8 layers × 10 Euler steps); ViT blocks **×36**; Stage‑1 **×10**; cameras **×3**.
+
+**Chunk context:** busy Σ ≈ **57.3 ms**, wall ≈ **128.7 ms** (§0.2). Primary gap-fusion cases below sum to ≈ **49.8 ms** (~**39%** of chunk wall / ~**87%** of busy) — an **upper bound** if all listed chains fuse independently with no residual launch tax.
+
+Already fused in this capture (gap benefit **0**): ViT **FlashAttention** (§3), ViT **`vectorized_layer_norm`** (§3).
+
+### 11.1 Elementwise chains
+
+| Case | Stage / CUPTI chain | Today | Potential | Per-call busy / gap / wall | ×rep | **Gap benefit** |
+|---|---|---|---|---:|---:|---:|
+| Image `2x−1` | §2 `mul`→`add` | 2 kernels | `fused_scale_bias` | 7.3 / **5.4** / 12.7 µs | ×3 | **0.02 ms** |
+| Stage‑1 time emb | §5 sincos helpers (`fill`/`mul`/`sin`/`cos`/`cat`…) | 14 kernels | `sincos_embedding` | 27.0 / **70.2** / 97.2 µs | ×10 | **0.70 ms** |
+| Euler `dt·v`+`x+…` | AtenOp §6.1 (tiny; not isolated in first-template tables) | 2 elementwise | `axpy` | ~few µs gap | ×10 | ≪0.1 ms |
+
+**Nsight signal:** `BinaryFunctor` / `mul` / `add` between big GEMMs. Gap/wall often **40–70%** on tiny chains — fusion wins on **launch tax**, not FLOPs.
+
+### 11.2 RMSNorm
+
+VLM/expert norms expand to **pow→mean→add→rsqrt→mul→cast→mul** (7 kernels). Contrast: ViT **LayerNorm** = 1 fused kernel.
+
+| Case | Template indices (1st unit) | Today | Potential | busy / gap / wall | ×rep | **Gap benefit** |
+|---|---|---|---|---:|---:|---:|
+| Prefill RMSNorm | §6 post-attn `pow…mul` (proxy for both norms/layer) | 7 kernels | `rms_norm` | 12.9 / **36.6** / 49.5 µs (**74%** idle) | ×32 | **1.17 ms** |
+| Even pre-attn | §7 `#0–6` | 7 | same | 9.9 / **34.4** / 44.3 µs (**78%**) | ×80 | **2.75 ms** |
+| Even post-attn | §7 after attn-out | 7 | same | 8.6 / **32.1** / 40.7 µs (**79%**) | ×80 | **2.57 ms** |
+| Odd pre-attn | §8 `#0–6` | 7 | same | 8.5 / **26.5** / 35.0 µs (**76%**) | ×80 | **2.12 ms** |
+| Odd post-attn | §8 after attn-out | 7 | same | 8.7 / **30.6** / 39.3 µs (**78%**) | ×80 | **2.45 ms** |
+| **RMSNorm subtotal** | | | | | | **≈11.1 ms** |
+
+**Why gap ≫ busy:** each step is ~1–3 µs of work with ~4–7 µs idle between launches — classic unfused norm tax.
+
+### 11.3 RoPE
+
+Largest gap-fusion opportunity in this capture: **~41 kernels** (Q+K) or **~20** (odd Q-only) of arange/sin/cos/mul/add/cast/cat before `QKᵀ`.
+
+| Case | Template | Today | Potential | busy / gap / wall | ×rep | **Gap benefit** |
+|---|---|---|---|---:|---:|---:|
+| Prefill RoPE Q+K | §6 before `magma` QK | 41 kernels | `apply_rotary_pos_emb` (+ shared freqs) | 63.9 / **239.9** / 303.9 µs (**79%** idle) | ×16 | **3.84 ms** |
+| Even RoPE Q+K | §7 before QK | 41 | same | 55.6 / **229.8** / 285.4 µs (**81%**) | ×80 | **18.38 ms** |
+| Odd RoPE Q-only | §8 before QK | 20 | same | 25.2 / **112.2** / 137.3 µs (**82%**) | ×80 | **8.97 ms** |
+| **RoPE subtotal** | | | | | | **≈31.2 ms** |
+
+**Nsight verify:** median inter-kernel gap in expert templates ≈ **4.3–4.7 µs**; RoPE chains stack **~40** of those → hundreds of µs wall per layer of which **~80%** is gap.
+
+### 11.4 Matmul + transpose / cast / expand (GQA)
+
+Two different wins apply here. **Gap benefit** (§11.0) is often **~0** when `transpose` / `expand` are **views** (no CUPTI launch). Fusion can still pay by **folding prologue/epilogue work into the GEMM** (or Flash): delete standalone cast/copy busy, read bf16 with FP32 accumulate in-kernel, apply `transB` / GQA broadcast without a materializing layout pass.
+
+| Case | Today (Nsight) | Gap? | Prologue / epilogue busy (1st template) | Potential fused behavior | **Busy-fold benefit** (×rep, upper bound if casts elided) |
+|---|---|---|---:|---|---:|
+| `QKᵀ` transpose / permute | Often **view only** — no CUPTI row between RoPE and `magma`/`CUTLASS` | **No** | — | GEMM with **`transB`** / Flash layout args — never materialize Kᵀ | **0 gap**; still removes aten/layout tax and keeps a single launch path |
+| Prefill cast cluster before `QKᵀ` | 4× `copy/cast` (~2.8–3.2 µs each) then FP32 `magma_sgemm` | Yes (also in RoPE tail) | **busy Σ ≈12.0 µs** | bf16 IO + FP32-accum GEMM / Flash — drop explicit bf16→fp32 copies | **≈0.19 ms** ×16; gaps among these casts already in §11.3/§11.5 ledgers |
+| Even cast cluster before `QKᵀ` | 4× `copy/cast` then `magma` | Yes | **busy Σ ≈11.2 µs** | same | **≈0.89 ms** ×80 |
+| Odd cast cluster before `QKᵀ` | 3× `copy/cast` then `magma` | Yes | **busy Σ ≈6.8 µs** | same | **≈0.54 ms** ×80 |
+| Softmax → `A·V` dtype | Prefill/even: `bf16_copy` (~1.3–2.9 µs) between softmax and CUTLASS `A·V` | Yes (§11.5) | **busy ≈2.9 / 1.3 µs** | Keep probs in-kernel or softmax→bf16 **epilogue** into `A·V` preload | **≈0.05 / 0.10 ms**; gap already in §11.5 |
+| Odd Cross-K/V casts | `copy/cast`×2 before each FP32 `simt_sgemm` (+ `splitK` epilogue) | Yes | **busy ≈4.2 + 3.8 µs** (pre-K / pre-V) | Fused cross-attn or bf16 TC GEMM reading activations without separate cast | **≈0.64 ms** ×80 (+ `splitK` busy ≈3.2 µs×2 can fold into better epilogue) |
+| Post-`A·V` layout/cast before out-Linear | Prefill ~3 kernels (**≈24.5 µs**); even ~3 (**≈14.2 µs**); odd cast+bf16 (**≈2.1 µs**) | Yes | see busy | Fuse permute/cast into attn-out GEMM args / epilogue | **≈0.39 / 1.14 / 0.17 ms** |
+| GQA 5→15 `expand` | Usually **view** (no DRAM / no kernel) | **No** | — | Flash/SDPA **GQA** broadcasts K/V inside the kernel | **0 gap**; still drops expand aten and avoids accidental materialize |
+
+**How to read:** view-only transpose/expand → fusion benefit is **prologue/epilogue / API**, not gap. Explicit `copy/cast` / `bf16_copy` / `splitK` next to a matmul → fusion can omit that kernel’s **busy** (and its flanking gaps). Summing the cast busy-fold column above (without double-counting §11.3 RoPE-tail casts) is on the order of **~2–4 ms / chunk** of *extra* savings beyond pure gap — treat as an upper bound until a fused build is re-measured.
+
+**Nsight signal:** `direct_copy` / `LoadWithCast` / `bfloat16_copy` immediately before/after `magma_sgemm`, CUTLASS `A·V`, or Cross-K/V `simt_sgemm`; absence of a kernel between `transpose` aten and GEMM = view (optimize with flags, not gap deletion).
+
+### 11.5 Attention (eager → Flash/SDPA)
+
+| Case | CUPTI chain | Today | Potential | busy / gap / wall | ×rep | **Gap benefit** |
+|---|---|---|---|---:|---:|---:|
+| Prefill eager | `qk_matmul`→`mul`→`fill`→`where`→`softmax`→`bf16_copy`→`av_matmul_bf16` | 7 kernels | **Flash/SDPA** (ViT pattern) | 51.9 / **17.2** / 69.2 µs (**25%** idle) | ×16 | **0.28 ms** |
+| Even eager | same pattern, scores `[…,50,291]` | 7 | same | 26.4 / **30.0** / 56.4 µs (**53%**) | ×80 | **2.40 ms** |
+| Odd cross-attn | `qk`→…→`softmax`→`av_matmul_fp32` (no bf16 cast) | 6 | fused cross-attn / SDPA | 24.7 / **27.2** / 51.9 µs (**52%**) | ×80 | **2.18 ms** |
+| **Attn gap subtotal** | | | | | | **≈4.9 ms** |
+| ViT Flash (ref) | single `flash_fwd` | **Already fused** | — | 83 µs / **0** / 83 µs | ×36 | **0** |
+
+**Important:** Flash also often **cuts busy** vs magma+softmax+CUTLASS (algorithmic). That busy delta is **extra** beyond the **4.9 ms** gap figure and is **not** included here.
+
+### 11.6 MLP (SwiGLU / GELU)
+
+| Case | CUPTI chain | Today | Potential | busy / gap / wall | ×rep | **Gap benefit** |
+|---|---|---|---|---:|---:|---:|
+| Prefill SwiGLU | `gemm`→`silu`→`gemm`→`mul`→`gemm`→`add` | 6 | SwiGLU / epilogue fuse | 122.1 / **8.4** / 130.5 µs (**6%**) | ×16 | **0.14 ms** |
+| Even SwiGLU | +`splitK` before residual | 7 | same | 41.0 / **10.0** / 51.0 µs (**20%**) | ×80 | **0.80 ms** |
+| Odd SwiGLU | same | 7 | same | 39.8 / **10.1** / 49.9 µs (**20%**) | ×80 | **0.81 ms** |
+| ViT GELU epilogue | `gemm`→`gelu` | 2 | fuse GELU into up-GEMM | 130.6 / **2.2** / 132.8 µs | ×36 | **0.08 ms** |
+| ViT residual | `gemm`→`add` | 2 | fuse add into GEMM epilogue | 52.8 / **1.1** / 54.0 µs | ×72 | **0.08 ms** |
+| Stage‑1 SiLU | `gemm`→`cublas_epilogue`→`silu`→`gemm` | 4 | `linear_silu_linear` | 64.4 / **4.2** / 68.5 µs | ×10 | **0.04 ms** |
+| **MLP gap subtotal** | | | | | | **≈1.9 ms** |
+
+GEMM-heavy chains are **busy-dominated** (gap only **6–20%** of wall) — fusion still helps launch tax, but RoPE/RMSNorm dominate the **gap** ledger.
+
+### 11.7 Summary — quantified gap benefit (chunk #3)
+
+| Priority | Fusion family | **Gap benefit / chunk** | Share of listed gaps | Notes |
+|---|---|---:|---:|---|
+| **P0** | **RoPE** → `apply_rotary_pos_emb` | **≈31.2 ms** | **63%** | Even Q+K alone **18.4 ms** |
+| **P0** | **RMSNorm** → one kernel | **≈11.1 ms** | **22%** | ~75–80% of each norm wall is gap |
+| **P1** | Eager attn → **Flash/SDPA** | **≈4.9 ms** | **10%** | + possible busy win (not counted) |
+| **P2** | SwiGLU / GELU / residual epilogues | **≈1.9 ms** | **4%** | Busy-dominated chains |
+| **P2** | Stage‑1 time emb + image `2x−1` | **≈0.7 ms** | **1%** | Tiny absolute |
+| | **Listed total (gap-only)** | **≈49.8 ms** | **100%** | vs busy **57.3 ms** / wall **128.7 ms** |
+| *(extra)* | Matmul **cast/layout prologue–epilogue** fold (§11.4) | **gap often ~0** for view transpose/GQA | — | **+~2–4 ms** busy-fold upper bound if casts/`splitK` elided into GEMM/Flash |
+
+**Reading:** On this GPU path, **fusion’s primary CUPTI-visible win is deleting idle between micro-kernels** (RoPE/RMSNorm), not shaving GEMM busy. View-only transpose/expand still matter via **prologue/epilogue busy fold** (§11.4). Pair with AtenOp §6 for the matching ATen rewrite targets.
+
+### 11.8 How to verify a fusion claim on an nsys-rep
+
+1. Pick the aten subsequence (AtenOp §6) and the matching **first-template** CUPTI window (§1 / §2–§9).
+2. List demangled launches in order; confirm **N semantic steps → N kernels** (unfused) vs **1 kernel** (already fused, e.g. Flash/LN).
+3. Compute **gap_µs** = Σ `max(0, start_{i+1}−end_i)` on that chain; scale by **repeat**.
+4. After a change: re-export sqlite — fused APIs should **drop launch count** in the window and shrink **gap** (and often wall); busy may stay similar unless the algo changed (Flash).
+
+---
+
+## 12. Skill — produce a GPU kernel list for any inference path
 
 This section is the **playbook** used to build *this* file (`smolVLA_kerne_list_gpu_backend.md`). Pair it with the AtenOp skill (`SmolVLA_AtenOp_List_gpu_backend.md` **§7**): ATen chrono = *what PyTorch called*; this doc = *what the GPU ran*, with per-launch times and roofline metrics.
 
-### 10.1 Goal and deliverables
+### 12.1 Goal and deliverables
 
 | Deliverable | Content |
 |---|---|
@@ -603,17 +809,17 @@ This section is the **playbook** used to build *this* file (`smolVLA_kerne_list_
 | **Kernel tables (first template only)** | Per-launch: operator label, I/O shapes/dtypes, IO/BD/GFLOPs metrics, bottleneck, CUPTI µs, full demangled kernel |
 | **Platform §** | Peak TFLOP/s + DRAM GB/s for the capture GPU (roofline denominators) |
 
-**In scope:** CUPTI kernel launches in order; algorithmic IO/FLOPs; measured util vs peaks.  
+**In scope:** CUPTI kernel launches in order; algorithmic IO/FLOPs; measured util vs peaks.
 **Out of scope:** replacing ATen chrono (build that first or in parallel); using CSV `cuda_gpu_kern_sum` averages as per-launch times.
 
-### 10.2 Prerequisites
+### 12.2 Prerequisites
 
 1. **AtenOp inventory** (recommended) — same stages/templates as `*_AtenOp_List_gpu_backend.md` / `*_aten_chrono.json` for shape/dtype matching.
 2. **Nsight Systems** on the target machine (this capture: **2025.1.3**).
 3. **Eager CUDA inference** target that can run between `cudaProfilerStart` / `Stop` (this repo: `src/smolvla_nsight_target.py`).
 4. **GPU peak sheet** for §0.1-style table (SM count, DRAM GB/s, BF16 TC / FP32 CUDA peaks at boost).
 
-### 10.3 Step-by-step (SmolVLA → generalize)
+### 12.3 Step-by-step (SmolVLA → generalize)
 
 #### Step 1 — Capture one steady-state chunk with Nsight
 
@@ -655,7 +861,7 @@ Optional: generate `cuda_gpu_kern_sum.csv` for overview — **do not** use its A
 1. Find the first kernel of interest (e.g. first `upsample` / first stage marker).
 2. Set `t0 = MIN(start)` over all CUPTI kernels (or document another origin).
 3. Report times as **ms relative to `t0`**.
-4. If the report contains multiple inferences, choose the **steady** one (here: chunk whose upsample sits at **540.4229 ms** after 2 warmups).
+4. If the report contains multiple inferences, choose the **steady** one (here: chunk #3, upsample @ **9.824808 s** absolute / **540.4229 ms** rel.; see §0.2).
 
 #### Step 4 — Map stage windows (wall + busy)
 
@@ -702,7 +908,7 @@ Rules:
 
 #### Step 7 — Fill IO / GFLOPs / AI / Theoretical bottleneck
 
-Use §0.2:
+Use §0.3:
 
 1. **IO Volume** = Σ bytes(inputs) + bytes(output) from the I/O column.
 2. **2D FLOPs** = `2×M×K×N` (and batch) for GEMM/conv; tag BF16 vs FP32.
@@ -721,43 +927,43 @@ Using CUPTI GPU time `t`:
 | **GFLOPs/sec** | `GFLOPs / t` (sum 2D+1D if both present) |
 | **FLOPs util** | `(GFLOPs/sec) / peak`; peak = BF16 TC for **2D BF16**, else CUDA peak |
 
-If **BD util ≥ 100%**, tag the cell with a likely cause (`⚠L2/cache·algo-IO≠DRAM`, `⚠inferred-oversize-IO`, `⚠launch-floor+algo-IO≠DRAM`, `⚠fill/algo-IO≠DRAM`) — see §0.2. Do not treat it as real DRAM > peak.
+If **BD util ≥ 100%**, tag the cell with a likely cause (`⚠L2/cache·algo-IO≠DRAM`, `⚠inferred-oversize-IO`, `⚠launch-floor+algo-IO≠DRAM`, `⚠fill/algo-IO≠DRAM`) — see §0.3. Do not treat it as real DRAM > peak.
 
 #### Step 9 — Write the markdown and freeze artifacts
 
 Document structure (this file’s layout):
 
-1. §0 Source + platform peaks + metric definitions  
-2. §1 Stage durations (full chunk)  
-3. §2… kernel tables for each **first** template  
-4. §10 this skill  
+1. §0 Source + platform peaks + metric definitions
+2. §1 Stage durations (full chunk)
+3. §2… kernel tables for each **first** template
+4. §12 this skill
 
 Check in / publish: `.nsys-rep`, sqlite (or export recipe), kernel-list md, link to AtenOp list + chrono JSON.
 
-### 10.4 Checklist for a new inference case
+### 12.4 Checklist for a new inference case
 
-- [ ] AtenOp stages/templates available (or build in parallel per AtenOp §7)  
-- [ ] Nsight profile with warmup outside `cudaProfilerStart/Stop`  
-- [ ] `nsys export` sqlite; query `CUPTI_ACTIVITY_KIND_KERNEL`  
-- [ ] `t0` + measured chunk chosen; relative ms windows recorded  
-- [ ] Stage wall/busy/gap table filled; Euler overlap noted if any  
-- [ ] First-template bounds fixed (no stolen next-layer RMSNorm)  
-- [ ] Each launch labeled; Aten-matched vs `*[no aten]*` / `[dtype≠aten]`  
-- [ ] IO / 2D / 1D / AI / theoretical bottleneck per §0.2  
-- [ ] BD + FLOPs util from CUPTI time; ⚠ tags on BD util ≥100%  
-- [ ] Platform peaks documented for *this* GPU  
-- [ ] Full demangled kernel strings retained  
+- [ ] AtenOp stages/templates available (or build in parallel per AtenOp §7)
+- [ ] Nsight profile with warmup outside `cudaProfilerStart/Stop`
+- [ ] `nsys export` sqlite; query `CUPTI_ACTIVITY_KIND_KERNEL`
+- [ ] `t0` + measured chunk chosen; relative ms windows recorded
+- [ ] Stage wall/busy/gap table filled; Euler overlap noted if any
+- [ ] First-template bounds fixed (no stolen next-layer RMSNorm)
+- [ ] Each launch labeled; Aten-matched vs `*[no aten]*` / `[dtype≠aten]`
+- [ ] IO / 2D / 1D / AI / theoretical bottleneck per §0.3
+- [ ] BD + FLOPs util from CUPTI time; ⚠ tags on BD util ≥100%
+- [ ] Platform peaks documented for *this* GPU
+- [ ] Full demangled kernel strings retained
 
-### 10.5 What to copy vs rewrite
+### 12.5 What to copy vs rewrite
 
 | Keep as-is (skill) | Rewrite per model / GPU |
 |---|---|
 | CUPTI per-launch timing; ignore kern_sum Avg for tables | Capture command, warmup/repeat counts |
-| Column layout + §0.2 bottleneck / util math | Landmark kernels, stage windows, templates |
+| Column layout + §0.3 bottleneck / util math | Landmark kernels, stage windows, templates |
 | `*[no aten]*` / `[dtype≠aten]` / ⚠ BD tags | Peak TFLOP/s and DRAM GB/s (§0.1) |
 | Pair with Aten chrono for I/O | Aten shapes, even/odd (or other) fingerprints |
 
-### 10.6 Minimal adapter sketch (other model)
+### 12.6 Minimal adapter sketch (other model)
 
 ```text
 1) nsys profile --capture-range=cudaProfilerApi -- your_infer_target.py
@@ -766,7 +972,7 @@ Check in / publish: `.nsys-rep`, sqlite (or export recipe), kernel-list md, link
 4) For each first template:
      for kernel in window:
        label ← match Aten or infer *[no aten]*
-       IO, FLOPs ← shapes; bottleneck ← §0.2
+       IO, FLOPs ← shapes; bottleneck ← §0.3
        BD, utils ← IO/FLOPs ÷ CUPTI_time vs peaks
 5) Emit markdown tables + stage duration summary
 ```

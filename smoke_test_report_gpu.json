@@ -1,0 +1,203 @@
+{
+  "hostname": "5cc711215e18",
+  "python": "3.12.14",
+  "torch": "2.11.0+cu128",
+  "cuda_available": true,
+  "smoke_device_req": "cuda",
+  "device_forced": "cuda",
+  "model_id": "lerobot/smolvla_base",
+  "dataset_id": "lerobot/libero",
+  "steps": {
+    "cli_probe_s": 8.23
+  },
+  "cuda": {
+    "device_name": "NVIDIA GeForce RTX 5060 Ti",
+    "device_capability": [
+      12,
+      0
+    ],
+    "driver_cuda_version": "12.8",
+    "memory_gb": 16.62
+  },
+  "real_world_cli": {
+    "lerobot_record_help": {
+      "returncode": 0,
+      "has_so100": true,
+      "has_policy_path_or_type": false,
+      "first_line": "usage: lerobot-record [-h] [--config_path str] [--robot str]"
+    },
+    "lerobot_rollout_help": {
+      "returncode": 0,
+      "has_so100": true,
+      "has_policy_path_or_type": true,
+      "first_line": "usage: lerobot-rollout [-h] [--config_path str] [--robot str]"
+    },
+    "serial_ports": [],
+    "video_devices": [],
+    "record_dry_run": {
+      "returncode": 1,
+      "timed_out": false,
+      "output_tail": "e \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 220, in parse\n    return parser.parse_args(args)\n           ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 108, in parse_args\n    args, _ = self.parse_known_args(args, namespace, is_parse_args=True)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 145, in parse_known_args\n    parsed_t = self._postprocessing(parsed_args)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 189, in _postprocessing\n    cfg = decoding.decode(self.config_class, deflat_d)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/parsers/registry_utils.py\", line 81, in wrapper\n    return base_func(*args, **kw)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/parsers/decoding.py\", line 66, in decode\n    return get_decoding_fn(cls)(raw_value, ())  # type: ignore\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/parsers/decoding.py\", line 179, in decode_dataclass\n    raise ParsingError(f\"Couldn't instantiate class {stringify_type(cls)} using the given arguments.\") from e\ndraccus.utils.ParsingError: Couldn't instantiate class RecordConfig using the given arguments."
+    },
+    "hardware_present": false
+  },
+  "model": {
+    "load_seconds": 13.36,
+    "param_count": 450046176,
+    "trainable_param_count": 99880992,
+    "parameter_devices": [
+      "cuda:0"
+    ],
+    "parameter_dtypes": [
+      "torch.bfloat16",
+      "torch.float32"
+    ],
+    "chunk_size": 50,
+    "n_action_steps": 50,
+    "num_steps": 10,
+    "input_features": {
+      "observation.state": [
+        6
+      ],
+      "observation.images.camera1": [
+        3,
+        256,
+        256
+      ],
+      "observation.images.camera2": [
+        3,
+        256,
+        256
+      ],
+      "observation.images.camera3": [
+        3,
+        256,
+        256
+      ]
+    },
+    "output_features": {
+      "action": [
+        6
+      ]
+    }
+  },
+  "processors": {
+    "seconds": 1.25
+  },
+  "dataset": {
+    "ok": false,
+    "skipped": true,
+    "reason": "using fixed deterministic dummy observation (SMOKE_SEED); libero not required",
+    "smoke_seed": 0,
+    "task": "Put lego brick into the transparent box",
+    "state": [
+      0.0,
+      0.10000000149011612,
+      -0.10000000149011612,
+      0.20000000298023224,
+      -0.20000000298023224,
+      0.0
+    ],
+    "image_keys": [
+      "observation.images.camera1",
+      "observation.images.camera2",
+      "observation.images.camera3"
+    ]
+  },
+  "inference": {
+    "seconds": 0.48,
+    "batch_source": "fixed_dummy_smolvla_base",
+    "smoke_seed": 0,
+    "fixed_noise": true,
+    "action": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "torch.float32",
+      "device": "cpu",
+      "min": -0.39810889959335327,
+      "max": 0.19139112532138824,
+      "mean": -0.09570863842964172,
+      "finite": true,
+      "sample": [
+        -0.06281795352697372,
+        -0.02878165990114212,
+        -0.1933826208114624,
+        0.19139112532138824,
+        -0.08255180716514587,
+        -0.39810889959335327
+      ]
+    },
+    "determinism": {
+      "runs": 2,
+      "identical": true,
+      "max_abs_diff": 0.0,
+      "ok": true
+    },
+    "reasonableness": [
+      {
+        "label": "run1",
+        "shape_ok": true,
+        "dtype_ok": true,
+        "finite_ok": true,
+        "not_all_zero": true,
+        "abs_max": 0.39810889959335327,
+        "abs_max_ok": true,
+        "ok": true
+      },
+      {
+        "label": "run2",
+        "shape_ok": true,
+        "dtype_ok": true,
+        "finite_ok": true,
+        "not_all_zero": true,
+        "abs_max": 0.39810889959335327,
+        "abs_max_ok": true,
+        "ok": true
+      }
+    ]
+  },
+  "stage_profile": {
+    "stage0_prefix_embed_s": 0.024,
+    "stage1_suffix_embed_s": 0.0019,
+    "stage2_prefill_s": 0.0072,
+    "stage3_expert_denoise_s": 0.057,
+    "stage3_euler_update_s": 0.0001,
+    "stage4_crop_queue_postprocess_s": 0.0001,
+    "num_euler_steps": 10,
+    "stage3_expert_plus_euler_s": 0.0572,
+    "stage3_inclusive_with_stage1_s": 0.0591,
+    "stages_0_to_4_sum_s": 0.0904,
+    "wall_clock_total_s": 0.0906,
+    "action": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "torch.float32",
+      "device": "cpu",
+      "min": -0.39810889959335327,
+      "max": 0.19139112532138824,
+      "mean": -0.09570863842964172,
+      "finite": true,
+      "sample": [
+        -0.06281795352697372,
+        -0.02878165990114212,
+        -0.1933826208114624,
+        0.19139112532138824,
+        -0.08255180716514587,
+        -0.39810889959335327
+      ]
+    },
+    "share_pct": {
+      "stage0": 26.62,
+      "stage1": 2.12,
+      "stage2": 7.96,
+      "stage3_expert": 63.25,
+      "stage4": 0.06
+    }
+  },
+  "total_seconds": 23.51,
+  "status": "PASS"
+}
