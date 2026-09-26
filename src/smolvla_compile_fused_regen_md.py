@@ -79,6 +79,36 @@ _DTYPE_SHORT = {
 }
 
 
+def _soft_wrap_name(name: str, width: int = 40) -> str:
+    """Markdown-visible wrap: `part_`<br>`part` (br outside backticks)."""
+    if len(name) <= width:
+        return f"`{name}`"
+    tokens, buf = [], ""
+    for ch in name:
+        buf += ch
+        if ch == "_":
+            tokens.append(buf)
+            buf = ""
+    if buf:
+        tokens.append(buf)
+    chunks, cur = [], ""
+    for tok in tokens:
+        if not cur:
+            cur = tok
+        elif len(cur) + len(tok) <= width:
+            cur += tok
+        else:
+            chunks.append(cur)
+            cur = tok
+    if cur:
+        chunks.append(cur)
+    if len(chunks) >= 2 and len(chunks[-1]) < 8:
+        chunks[-2] += chunks[-1]
+        chunks.pop()
+    return "<br>".join(f"`{c}`" for c in chunks)
+
+
+
 def _fmt_pair(shape, dtype) -> str:
     if shape is None and dtype is None:
         return "—"
@@ -686,22 +716,32 @@ def _write_markdown(payload: dict) -> str:
         lines.append("")
         lines.append(
             "Ops below are in **Inductor codegen calling order** "
-            "(`Runner.call` / `partition_*`). "
-            "**Fused aten** = origins merged into this launch (provenance). "
-            "Input/Output from buffer allocs / FX meta when available."
+            "(`Runner.call` / `partition_*`) — column **Order**. "
+            "Input/Output from buffer allocs / FX meta when available. "
+            "**IO / GFLOPs / AI / Theoretical bottleneck** from shapes + op heuristics "
+            "(same roofline rule as eager kerne_list §0.3; `—` when shapes missing). "
+            "**BD / GFLOPs/sec / util / GPU time** from nsys CUPTI "
+            "(`smolvla_compile_fused_table_timing.py`). "
+            "**meaning** / **fused aten** (provenance) are the last two columns."
         )
         lines.append("")
         lines.append(
-            "| Seq | kernel / op | kind | meaning | fused aten | "
-            "Input (shape, dtype) | Output (shape, dtype) |"
+            "| Order | kernel / op | kind | Input (shape, dtype) | Output (shape, dtype) | "
+            "IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | "
+            "FLOPs util ratio | Arithmetic intensity (FLOP/byte) | "
+            "Theoretical bottleneck | GPU time per launch | meaning | fused aten |"
         )
-        lines.append("|---:|---|---|---|---|---|---|")
+        lines.append(
+            "|---:|---|---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|---|"
+        )
         for e in g["ops"]:
             fused_list = e.get("fused_aten") or []
             fused = ", ".join(f"`{x}`" for x in fused_list) if fused_list else "—"
+            # Metrics/timing filled by post-process scripts; placeholders keep schema.
             lines.append(
-                f"| {e['i']} | `{e['name']}` | `{e['kind']}` | {e['meaning']} | "
-                f"{fused} | `{e.get('input_str') or '—'}` | `{e.get('output_str') or '—'}` |"
+                f"| {e['i']} | {_soft_wrap_name(e['name'])} | `{e['kind']}` | "
+                f"`{e.get('input_str') or '—'}` | `{e.get('output_str') or '—'}` | "
+                f"— | — | — | — | — | — | — | — | — | {e['meaning']} | {fused} |"
             )
         lines.append("")
         lines.append("---")
@@ -714,6 +754,12 @@ def _write_markdown(payload: dict) -> str:
     lines.append("export SMOKE_COMPILE_MODE=reduce-overhead")
     lines.append("python src/smolvla_compile_fused_dump.py   # cold compile + debug dumps")
     lines.append("python src/smolvla_compile_fused_regen_md.py")
+    lines.append("python src/smolvla_compile_fused_fill_io.py       # infer missing Input/Output")
+    lines.append("python src/smolvla_compile_fused_annotate_stage.py  # stage col; collapse G5→ViT L0, G8→L0/euler0")
+    lines.append("# python src/smolvla_compile_fused_annotate_stage.py --full  # keep full ViT×12 + Euler×10×16")
+    lines.append("python src/smolvla_compile_fused_table_metrics.py  # fill IO/GFLOPs/AI/bottleneck")
+    lines.append("python src/smolvla_compile_fused_table_timing.py   # BD/util/GFLOPs-sec/GPU time from nsys")
+    lines.append("python src/smolvla_compile_fused_table_wrap.py     # soft-wrap long name/input/meaning/fused")
     lines.append("```")
     lines.append("")
     return "\n".join(lines)
