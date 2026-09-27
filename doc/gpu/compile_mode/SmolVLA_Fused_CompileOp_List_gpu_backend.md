@@ -30,6 +30,7 @@ This document is the **Inductor post-fusion / codegen** counterpart of `SmolVLA_
 1. Compile `sample_actions` with Inductor debug dumps (`ir_post_fusion.txt`, `output_code.py`, provenance JSON).
 2. Walk each graph’s `Runner.call` / `partition_*` body in **source order** to list launches: `aten::*`, `extern_kernels.*`, `triton_*_fused_*.run`.
 3. Attach fused aten origins from `inductor_provenance_tracking_node_mappings.json` (`cppCodeToPost`) and I/O shapes/dtypes from `empty_strided_*` / FX header comments.
+4. **Pre** (before graph #1): eager `prepare_images` upsample path from nsys CUPTI (not Inductor) — see §Pre.
 
 | FX list (`CompileOp`) | Fused list (this file) |
 |---|---|
@@ -43,6 +44,7 @@ Same Dynamo partitions as the FX compile list (8 graphs). See `SmolVLA_CompileOp
 
 | Graph | Fused launches | Role | Key tensors in → out |
 |---:|---:|---|---|
+| **Pre** | 4 | Eager `prepare_images` (outside Inductor): bilinear upsample + `2x−1` + mask fill. Table = **first camera** (×3 cams/chunk). | `[1,3,256,256] f32` → `[1,3,512,512] f32` (+ mask) |
 | **1** | 1 | Cast camera image f32 → bf16 (ViT dtype). | `image` `[1,3,512,512] f32` → `[…] bf16` |
 | **2** | 1 | Build full ViT patch attention mask (`ones` → bool). | `ones` → mask `[1,32,32] bool` |
 | **3** | 8 | ViT patch embed (`conv2d` 16×16) + mask-derived position-id bookkeeping. | `pixel_values` + patch weight/bias + mask → patch tokens `[1,1024,768]`, `position_ids`, flat mask |
@@ -98,6 +100,25 @@ Same Dynamo partitions as the FX compile list (8 graphs). See `SmolVLA_CompileOp
 | `triton_per_fused__to_copy__unsafe_view_add_addmm_mean_mul_pow_rsqrt_view_26` | 10 |
 | `triton_per_fused__to_copy__unsafe_view_add_addmm_mean_mul_pow_rsqrt_view_28` | 10 |
 | `triton_per_fused__to_copy__unsafe_view_add_addmm_mean_mul_pow_rsqrt_view_33` | 10 |
+
+---
+
+## Pre. Eager `prepare_images` — upsample / scale / mask (outside Inductor)
+
+**Meaning:** Camera preprocess before compiled `sample_actions` graphs: bilinear upsample 256→512, image scale `2x−1`, bool mask fill. **Not** an Inductor fused graph — still eager ATen kernels (see `smolVLA_kerne_list_gpu_backend.md` §4.1).
+
+**Dataflow (this stage):** `[1,3,256,256] f32` → `[1,3,512,512] f32` (+ `[1,32,32] bool` mask). **Repeat ×3 cameras** / chunk; table = **first camera** only (same convention as G1–G6).
+
+**Launches (calling order):** 4 · triton=0 · extern=0 · aten=4 (*(representative)* **cam0** only; ×3 cams in full chunk)
+
+Ops below are in **CUPTI calling order** (warm chunk #3, first upsample window) — column **Order**. Input/Output from eager Stage‑0 conventions / shapes. **IO / GFLOPs / AI / Theoretical bottleneck** from shapes + op heuristics (same roofline rule as eager kerne_list §0.3; bilinear = 7 Basic/out). **BD / GFLOPs/sec / util / GPU time** from nsys CUPTI (`smolVLA_kerne_list_gpu_backend.md` §4.1 orders 3611–3614). **meaning** / **fused aten** are the last two columns (`fused aten` = ATen op; no Inductor fusion here).
+
+| Order | kernel / op | kind | stage / loop / layer | Input (shape, dtype) | Output (shape, dtype) | IO Volume /GB | BD /GB/s | BD util ratio | GFLOPs | GFLOPs/sec | FLOPs util ratio | Arithmetic intensity (FLOP/byte) | Theoretical bottleneck | GPU time per launch | meaning | fused aten |
+|---:|---|---|:---|---|---|---:|---:|---:|---|---:|---:|---:|---|---:|---|---|
+| 1 | `upsample_bilinear2d` | `aten` | Pre · prepare_images · cam0 | `[1,3,256,256] float32` | `[1,3,512,512] float32` | 3.93e-03 | 133.8 | 29.9% | 5.50e-03 (FP32) | 187.2 | 0.790% | 1.40 | bd-bounded | **29.38 µs** | ATen bilinear upsample 256→512 (eager<br>`prepare_images`) | `upsample_bilinear2d` |
+| 2 | `vectorized_elementwise_mul` | `aten` | Pre · prepare_images · cam0 | `[1,3,512,512] float32` | `[1,3,512,512] float32` | 6.29e-03 | 1723.3 | 384.7% ⚠L2/cache·algo-IO≠DRAM | 7.86e-04 (FP32) | 215.3 | 0.909% | 0.125 | bd-bounded | **3.65 µs** | Image scale `×2` (eager elementwise;<br>*[no aten]* name match) | `mul` |
+| 3 | `vectorized_elementwise_add` | `aten` | Pre · prepare_images · cam0 | `[1,3,512,512] float32` | `[1,3,512,512] float32` | 6.29e-03 | 1695.4 | 378.4% ⚠L2/cache·algo-IO≠DRAM | 7.86e-04 (FP32) | 211.9 | 0.894% | 0.125 | bd-bounded | **3.71 µs** | Image bias `−1` (eager elementwise;<br>*[no aten]* name match) | `add` |
+| 4 | `vectorized_elementwise_fill_bool` | `aten` | Pre · prepare_images · cam0 | — | `[1,32,32] bool` | 1.02e-06 | 1.275 | 0.285% | 0 | 0 | — | — | bd-bounded | **0.80 µs** | Fill ViT patch mask `ones→bool`<br>(eager; *[no aten]* name match) | `fill_` |
 
 ---
 
