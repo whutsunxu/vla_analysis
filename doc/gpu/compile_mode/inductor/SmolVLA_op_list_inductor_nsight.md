@@ -321,6 +321,15 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 
 ---
 
+## TODO
+
+1. Figure out how Inductor configures the fusion strategy (scheduler heuristics, `TORCHINDUCTOR_*` knobs, why these `FusedSchedulerNode` groups form).
+2. Build unit tests for key operators / problem cases (shapes and dtypes from this table + `post_fusion_ir/`).
+3. Get the Triton kernel source for key operators and analyse performance (nsys/ncu + `output_code.py` / chrome trace).
+4. Optimize the key kernels at Triton / LLIR level.
+
+---
+
 ## How to rebuild
 
 ```bash
