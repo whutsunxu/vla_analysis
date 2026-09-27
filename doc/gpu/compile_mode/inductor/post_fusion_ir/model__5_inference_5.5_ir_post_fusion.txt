@@ -1,0 +1,38 @@
+op0: SchedulerNode(ComputedBuffer)
+op0.writes = [MemoryDep('buf0', c0, {c0: 786432})]
+op0.unmet_dependencies = []
+op0.met_dependencies = [   MemoryDep('arg0_1', 98304*c0 + 3072*c1 + 24576*((c2//3072)) + 3072*(((12288*c0 + c2)//98304)) + (ModularIndexing(c2, 1, 3072)), {c0: 8, c1: 8, c2: 12288})]
+op0.outputs = [
+    buf0: ComputedBuffer
+    buf0.layout = FixedLayout('cuda:0', torch.bfloat16, size=[1, 8, 8, 12288], stride=[786432, 98304, 12288, 1])
+    buf0.users = [NodeUser(node=ExternKernelSchedulerNode(name='op1'), can_inplace=False, is_weak=False)]
+]
+op0.group.device = cuda:0
+op0.group.iteration = (786432, 1)
+op0.sizes = ((8, 8, 12288), ())
+arg0_1_layout = FixedLayout('cuda:0', torch.bfloat16, size=[1, 1024, 768], stride=[786432, 768, 1])
+buf0_layout = FixedLayout('cuda:0', torch.bfloat16, size=[1, 8, 8, 12288], stride=[786432, 98304, 12288, 1])
+class op0_loop_body:
+    var_ranges = {p0: 8, p1: 8, p2: 12288}
+    index0 = 98304*p0 + 3072*p1 + 24576*((p2//3072)) + 3072*(((12288*p0 + p2)//98304)) + (ModularIndexing(p2, 1, 3072))
+    index1 = 98304*p0 + 12288*p1 + p2
+    def body(self, ops):
+        get_index = self.get_index('index0')
+        load = ops.load('arg0_1', get_index)
+        get_index_1 = self.get_index('index1')
+        store = ops.store('buf0', get_index_1, load, None)
+        return store
+
+
+op1: ExternKernelSchedulerNode(ExternKernelOut)
+op1.writes = [StarDep(name='buf1', mode=None)]
+op1.unmet_dependencies = [StarDep(name='buf0', mode=None)]
+op1.met_dependencies = [StarDep(name='arg1_1', mode=None)]
+op1.outputs = [
+    buf1: ExternKernelOut
+    buf1.layout = FixedLayout('cuda:0', torch.bfloat16, size=[64, 960], stride=[960, 1])
+    buf1.users = [NodeUser(node=OUTPUT, can_inplace=False, is_weak=False)]
+]
+op1.node.kernel = extern_kernels.mm
+
+

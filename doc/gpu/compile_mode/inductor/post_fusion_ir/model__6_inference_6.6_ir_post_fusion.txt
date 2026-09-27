@@ -1,0 +1,33 @@
+op0: SchedulerNode(ComputedBuffer)
+op0.writes = [MemoryDep('buf0', c0, {c0: 46080})]
+op0.unmet_dependencies = []
+op0.met_dependencies = 
+    [   MemoryDep('arg0_1', c1 + 960*tmp0, {c0: 48, c1: 960}),
+        MemoryDep('arg1_1', c0, {c0: 48})]
+op0.outputs = [
+    buf0: ComputedBuffer
+    buf0.layout = FixedLayout('cuda:0', torch.bfloat16, size=[1, 48, 960], stride=[46080, 960, 1])
+    buf0.users = [NodeUser(node=OUTPUT, can_inplace=False, is_weak=False)]
+]
+op0.group.device = cuda:0
+op0.group.iteration = (46080, 1)
+op0.sizes = ((48, 960), ())
+arg1_1_layout = FixedLayout('cuda:0', torch.int64, size=[1, 48], stride=[48, 1])
+arg0_1_layout = FixedLayout('cuda:0', torch.bfloat16, size=[49280, 960], stride=[960, 1])
+buf0_layout = FixedLayout('cuda:0', torch.bfloat16, size=[1, 48, 960], stride=[46080, 960, 1])
+class op0_loop_body:
+    var_ranges = {p0: 48, p1: 960}
+    index0 = p0
+    index1 = 960*indirect0 + p1
+    index2 = 960*p0 + p1
+    def body(self, ops):
+        get_index = self.get_index('index0')
+        load = ops.load('arg1_1', get_index)
+        set_indirect0 = self.set_indirect0(load)
+        get_index_1 = self.get_index('index1')
+        load_1 = ops.load('arg0_1', get_index_1)
+        get_index_2 = self.get_index('index2')
+        store = ops.store('buf0', get_index_2, load_1, None)
+        return store
+
+
