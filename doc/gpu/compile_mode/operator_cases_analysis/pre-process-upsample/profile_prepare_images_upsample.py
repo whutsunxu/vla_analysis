@@ -6,7 +6,8 @@ No correctness checks. Warmup then N measured iters (default 10).
 Variants (PROFILE_VARIANT):
   full         — F.interpolate 256→512 + *2-1 + cam/patch masks  (case 1)
   no_scale     — F.interpolate only + masks                      (case 2: drop *2-1)
-  no_upsample  — *2-1 on input + masks                           (case 3: drop interpolate)
+  no_upsample  — *2-1 on **512²** input + masks                  (case 3: drop interpolate;
+                 input is already TARGET_HW so scale dims match full)
 
 Usage:
   PROFILE_VARIANT=full SMOKE_DEVICE=cuda python profile_prepare_images_upsample.py
@@ -47,6 +48,11 @@ def run_once(img: torch.Tensor, variant: str) -> tuple[torch.Tensor, torch.Tenso
     elif variant == "no_scale":
         x = F.interpolate(img, size=TARGET_HW, mode="bilinear", align_corners=False)
     elif variant == "no_upsample":
+        # Scale only at 512² (same spatial size as full after upsample).
+        if img.shape[-2:] != TARGET_HW:
+            raise ValueError(
+                f"no_upsample expects input {TARGET_HW}, got {tuple(img.shape[-2:])}"
+            )
         x = img * 2.0 - 1.0
     else:
         raise ValueError(f"unknown PROFILE_VARIANT={variant!r}")
@@ -66,7 +72,9 @@ def main() -> int:
     if device.type == "cuda":
         torch.cuda.manual_seed_all(0)
 
-    img = torch.rand(B, C, *IN_HW, dtype=torch.float32, device=device)
+    # no_upsample: feed native 512² so ×2−1 matches full's post-upsample size.
+    in_hw = TARGET_HW if VARIANT == "no_upsample" else IN_HW
+    img = torch.rand(B, C, *in_hw, dtype=torch.float32, device=device)
     print(
         f"variant={VARIANT} device={device} warmup={N_WARMUP} iters={N_ITERS} "
         f"in={tuple(img.shape)}"

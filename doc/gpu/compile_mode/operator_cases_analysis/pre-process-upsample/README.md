@@ -42,3 +42,7 @@ Writes `prepare_images_upsample_report.json` next to the script.
 ## Nsight ablation profiles
 
 See [`nsys/`](nsys/) — three `.nsys-rep` captures (full / no_scale / no_upsample), 10 iters each.
+
+Timing comparison report: [`ablation_timing_report.md`](ablation_timing_report.md).
+
+`PROFILE_VARIANT=no_upsample` feeds a native **`[1,3,512,512]`** tensor (no interpolate) so `×2−1` matches full’s post-upsample size.
