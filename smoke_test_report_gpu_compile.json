@@ -1,5 +1,5 @@
 {
-  "hostname": "393661b60895",
+  "hostname": "76c6d6eb5e38",
   "python": "3.12.14",
   "torch": "2.11.0+cu128",
   "cuda_available": true,
@@ -12,7 +12,7 @@
   "model_id": "lerobot/smolvla_base",
   "dataset_id": "lerobot/libero",
   "steps": {
-    "cli_probe_s": 18.11
+    "cli_probe_s": 36.54
   },
   "cuda": {
     "device_name": "NVIDIA GeForce RTX 5060 Ti",
@@ -46,7 +46,7 @@
     "hardware_present": false
   },
   "model": {
-    "load_seconds": 11.57,
+    "load_seconds": 19.04,
     "param_count": 450046176,
     "trainable_param_count": 99880992,
     "parameter_devices": [
@@ -88,7 +88,7 @@
     }
   },
   "processors": {
-    "seconds": 1.12
+    "seconds": 1.46
   },
   "dataset": {
     "ok": false,
@@ -111,9 +111,9 @@
     ]
   },
   "inference": {
-    "seconds": 26.8,
-    "first_select_action_s": 26.281,
-    "second_select_action_s": 0.518,
+    "seconds": 54.11,
+    "first_select_action_s": 53.068,
+    "second_select_action_s": 1.039,
     "batch_source": "fixed_dummy_smolvla_base",
     "smoke_seed": 0,
     "fixed_noise": true,
@@ -218,17 +218,17 @@
     ]
   },
   "stage_profile": {
-    "stage0_prefix_embed_s": 0.0247,
-    "stage1_suffix_embed_s": 0.0045,
-    "stage2_prefill_s": 0.0219,
-    "stage3_expert_denoise_s": 0.2008,
-    "stage3_euler_update_s": 0.0004,
-    "stage4_crop_queue_postprocess_s": 0.0001,
+    "stage0_prefix_embed_s": 0.0386,
+    "stage1_suffix_embed_s": 0.009,
+    "stage2_prefill_s": 0.0423,
+    "stage3_expert_denoise_s": 0.3919,
+    "stage3_euler_update_s": 0.0008,
+    "stage4_crop_queue_postprocess_s": 0.0002,
     "num_euler_steps": 10,
-    "stage3_expert_plus_euler_s": 0.2012,
-    "stage3_inclusive_with_stage1_s": 0.2058,
-    "stages_0_to_4_sum_s": 0.2524,
-    "wall_clock_total_s": 0.2532,
+    "stage3_expert_plus_euler_s": 0.3927,
+    "stage3_inclusive_with_stage1_s": 0.4017,
+    "stages_0_to_4_sum_s": 0.4829,
+    "wall_clock_total_s": 0.4844,
     "action": {
       "shape": [
         1,
@@ -250,13 +250,13 @@
       ]
     },
     "share_pct": {
-      "stage0": 9.79,
-      "stage1": 1.79,
-      "stage2": 8.67,
-      "stage3_expert": 79.71,
-      "stage4": 0.04
+      "stage0": 7.98,
+      "stage1": 1.87,
+      "stage2": 8.77,
+      "stage3_expert": 81.33,
+      "stage4": 0.05
     }
   },
-  "total_seconds": 58.35,
+  "total_seconds": 112.69,
   "status": "PASS"
 }

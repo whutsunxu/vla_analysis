@@ -1,14 +1,18 @@
 {
-  "hostname": "5cc711215e18",
+  "hostname": "76c6d6eb5e38",
   "python": "3.12.14",
   "torch": "2.11.0+cu128",
   "cuda_available": true,
   "smoke_device_req": "cuda",
   "device_forced": "cuda",
+  "compile": {
+    "enabled": false,
+    "mode": null
+  },
   "model_id": "lerobot/smolvla_base",
   "dataset_id": "lerobot/libero",
   "steps": {
-    "cli_probe_s": 8.23
+    "cli_probe_s": 30.58
   },
   "cuda": {
     "device_name": "NVIDIA GeForce RTX 5060 Ti",
@@ -42,7 +46,7 @@
     "hardware_present": false
   },
   "model": {
-    "load_seconds": 13.36,
+    "load_seconds": 36.02,
     "param_count": 450046176,
     "trainable_param_count": 99880992,
     "parameter_devices": [
@@ -55,6 +59,8 @@
     "chunk_size": 50,
     "n_action_steps": 50,
     "num_steps": 10,
+    "compile_model": false,
+    "compile_mode": "max-autotune",
     "input_features": {
       "observation.state": [
         6
@@ -82,7 +88,7 @@
     }
   },
   "processors": {
-    "seconds": 1.25
+    "seconds": 3.01
   },
   "dataset": {
     "ok": false,
@@ -105,7 +111,9 @@
     ]
   },
   "inference": {
-    "seconds": 0.48,
+    "seconds": 2.19,
+    "first_select_action_s": 1.685,
+    "second_select_action_s": 0.497,
     "batch_source": "fixed_dummy_smolvla_base",
     "smoke_seed": 0,
     "fixed_noise": true,
@@ -133,7 +141,58 @@
       "runs": 2,
       "identical": true,
       "max_abs_diff": 0.0,
+      "tol": 1e-05,
       "ok": true
+    },
+    "cpu_compare": {
+      "ok": true,
+      "ok_loose": true,
+      "skipped": false,
+      "baseline_path": "/root/workspace/vla_analysis/smoke_test_report.json",
+      "baseline_hostname": "575cd14fb466",
+      "baseline_device": "cpu",
+      "max_abs_diff": 0.0016598105430603027,
+      "mean_abs_diff": 0.0008705121581442654,
+      "tol": 0.01,
+      "tol_loose": 0.1,
+      "per_dim": [
+        {
+          "dim": 0,
+          "cpu": -0.06372098624706268,
+          "got": -0.06281795352697372,
+          "abs_diff": 0.0009030327200889587
+        },
+        {
+          "dim": 1,
+          "cpu": -0.029679380357265472,
+          "got": -0.02878165990114212,
+          "abs_diff": 0.000897720456123352
+        },
+        {
+          "dim": 2,
+          "cpu": -0.19337990880012512,
+          "got": -0.1933826208114624,
+          "abs_diff": 2.7120113372802734e-06
+        },
+        {
+          "dim": 3,
+          "cpu": 0.19098371267318726,
+          "got": 0.19139112532138824,
+          "abs_diff": 0.00040741264820098877
+        },
+        {
+          "dim": 4,
+          "cpu": -0.08119942247867584,
+          "got": -0.08255180716514587,
+          "abs_diff": 0.0013523846864700317
+        },
+        {
+          "dim": 5,
+          "cpu": -0.39644908905029297,
+          "got": -0.39810889959335327,
+          "abs_diff": 0.0016598105430603027
+        }
+      ]
     },
     "reasonableness": [
       {
@@ -159,17 +218,17 @@
     ]
   },
   "stage_profile": {
-    "stage0_prefix_embed_s": 0.024,
-    "stage1_suffix_embed_s": 0.0019,
-    "stage2_prefill_s": 0.0072,
-    "stage3_expert_denoise_s": 0.057,
-    "stage3_euler_update_s": 0.0001,
-    "stage4_crop_queue_postprocess_s": 0.0001,
+    "stage0_prefix_embed_s": 0.0375,
+    "stage1_suffix_embed_s": 0.0091,
+    "stage2_prefill_s": 0.0429,
+    "stage3_expert_denoise_s": 0.4003,
+    "stage3_euler_update_s": 0.0008,
+    "stage4_crop_queue_postprocess_s": 0.0002,
     "num_euler_steps": 10,
-    "stage3_expert_plus_euler_s": 0.0572,
-    "stage3_inclusive_with_stage1_s": 0.0591,
-    "stages_0_to_4_sum_s": 0.0904,
-    "wall_clock_total_s": 0.0906,
+    "stage3_expert_plus_euler_s": 0.4012,
+    "stage3_inclusive_with_stage1_s": 0.4103,
+    "stages_0_to_4_sum_s": 0.4909,
+    "wall_clock_total_s": 0.4923,
     "action": {
       "shape": [
         1,
@@ -191,13 +250,13 @@
       ]
     },
     "share_pct": {
-      "stage0": 26.62,
-      "stage1": 2.12,
-      "stage2": 7.96,
-      "stage3_expert": 63.25,
-      "stage4": 0.06
+      "stage0": 7.64,
+      "stage1": 1.86,
+      "stage2": 8.74,
+      "stage3_expert": 81.72,
+      "stage4": 0.05
     }
   },
-  "total_seconds": 23.51,
+  "total_seconds": 72.79,
   "status": "PASS"
 }

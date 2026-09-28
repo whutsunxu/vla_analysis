@@ -54,56 +54,11 @@ Same Dynamo partitions as the FX compile list (8 graphs). See `SmolVLA_CompileOp
 | **7** | 1 | Language token embedding lookup. | `tokens` `[1,48]` + `embed_tokens.weight` → `embedding` `[1,48,960] bf16` |
 | **8** | 46 | Prefix + VLM/expert flow-matching (attn / RoPE / Euler) → action chunk. | prefix acts + masks + weights → `x_t` / actions `[1,50,32] f32` |
 
-### 0.4 Global fused-launch histogram (top 40)
-
-**Total fused launches (sum over graphs):** 3541
-
-| kernel / op | count |
-|---|---:|
-| `extern_kernels.mm` | 1258 |
-| `extern_kernels.bmm` | 350 |
-| `triton_poi_fused__unsafe_view_clone_expand_unsqueeze_view_25` | 160 |
-| `triton_poi_fused__unsafe_view_mul_silu_27` | 160 |
-| `extern_kernels.addmm` | 82 |
-| `triton_per_fused_add_cumsum_min_sub_unsqueeze_1` | 80 |
-| `triton_poi_fused__to_copy__unsafe_view_add_arange_copy_cos_cumsum_div_mul_pow_sin_slice_split_sub_unsqueeze_view_10` | 80 |
-| `triton_poi_fused__to_copy__unsafe_view_add_arange_copy_cos_cumsum_div_mul_pow_sin_slice_split_sub_unsqueeze_view_11` | 80 |
-| `triton_per_fused__softmax__to_copy_bitwise_and_cat_exp_expand_le_mul_prepare_softmax_online_scalar_tensor_sub_unsqueeze_view_where_14` | 80 |
-| `triton_poi_fused_clone_permute_view_15` | 80 |
-| `triton_poi_fused__to_copy__unsafe_view_transpose_view_24` | 80 |
-| `triton_poi_fused__to_copy__unsafe_view_add_arange_copy_cos_cumsum_div_mul_pow_sin_slice_split_sub_unsqueeze_view_29` | 80 |
-| `triton_per_fused__softmax_bitwise_and_cat_exp_expand_le_mul_prepare_softmax_online_scalar_tensor_slice_sub_unsqueeze_view_where_31` | 80 |
-| `triton_poi_fused__to_copy__unsafe_view_clone_permute_view_32` | 80 |
-| `triton_per_fused__to_copy__unsafe_view_add_mean_mul_pow_rsqrt_34` | 70 |
-| `triton_per_fused__to_copy__unsafe_view_add_mean_mul_pow_rsqrt_40` | 70 |
-| `triton_per_fused__to_copy__unsafe_view_add_mean_mul_pow_rsqrt_41` | 70 |
-| `triton_per_fused__to_copy__unsafe_view_add_mean_mul_pow_rsqrt_42` | 70 |
-| `triton_poi_fused_clone_expand_transpose_unsqueeze_54` | 24 |
-| `triton_poi_fused__to_copy__unsafe_view_clone_expand_transpose_unsqueeze_56` | 24 |
-| `triton_poi_fused__unsafe_view_cat_clone_expand_slice_transpose_unsqueeze_view_58` | 24 |
-| `triton_poi_fused__to_copy__unsafe_view_cat_clone_expand_slice_transpose_unsqueeze_59` | 24 |
-| `triton_poi_fused__unsafe_view_cat_clone_expand_slice_transpose_unsqueeze_view_61` | 16 |
-| `triton_poi_fused__to_copy__unsafe_view_cat_clone_expand_slice_transpose_unsqueeze_62` | 16 |
-| `triton_poi_fused__unsafe_view_cat_slice_transpose_view_64` | 16 |
-| `triton_poi_fused__to_copy_cat_slice_transpose_65` | 16 |
-| `triton_poi_fused__unsafe_view_clone_expand_transpose_unsqueeze_view_16` | 15 |
-| `triton_poi_fused__to_copy__unsafe_view_add_arange_copy_cos_div_mul_pow_sin_slice_split_sub_unsqueeze_view_18` | 15 |
-| `triton_red_fused__softmax__to_copy_bitwise_and_exp_le_mul_prepare_softmax_online_scalar_tensor_sub_unsqueeze_view_where_19` | 15 |
-| `triton_poi_fused_clone_permute_view_20` | 15 |
-| `triton_poi_fused__unsafe_view_mul_silu_22` | 15 |
-| `triton_poi_fused_gelu_view_7` | 12 |
-| `triton_per_fused_sum_0` | 10 |
-| `triton_per_fused_cumsum_lift_fresh_unsqueeze_2` | 10 |
-| `triton_poi_fused__to_copy_cat_cos_expand_linspace_mul_pow_reciprocal_sin_unsqueeze_view_5` | 10 |
-| `triton_poi_fused_addmm_silu_view_6` | 10 |
-| `triton_per_fused__to_copy_add_addmm_mean_mul_pow_rsqrt_view_7` | 10 |
-| `triton_per_fused__to_copy__unsafe_view_add_addmm_mean_mul_pow_rsqrt_view_26` | 10 |
-| `triton_per_fused__to_copy__unsafe_view_add_addmm_mean_mul_pow_rsqrt_view_28` | 10 |
-| `triton_per_fused__to_copy__unsafe_view_add_addmm_mean_mul_pow_rsqrt_view_33` | 10 |
-
 ---
 
 ## Pre. Eager `prepare_images` — upsample / scale / mask (outside Inductor)
+
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.560580→19.560632 s`** (rel `10798.9923→10799.0444 ms`). First camera (table); ×3 cams in full Pre→G1.
 
 **Meaning:** Camera preprocess before compiled `sample_actions` graphs: bilinear upsample 256→512, image scale `2x−1`, bool mask fill. **Not** an Inductor fused graph — still eager ATen kernels (see `smolVLA_kerne_list_gpu_backend.md` §4.1).
 
@@ -124,6 +79,8 @@ Ops below are in **CUPTI calling order** (warm chunk #3, first upsample window) 
 
 ## 1. Fused Inductor graph #1 — Cast camera image f32 → bf16
 
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.560799→19.560802 s`** (rel `10799.2115→10799.2140 ms`).
+
 **Meaning:** Cast camera image f32 → bf16 (ViT dtype).
 
 **Dataflow (this graph):** `image` `[1,3,512,512] f32` → `[…] bf16`
@@ -140,6 +97,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 
 ## 2. Fused Inductor graph #2 — Build full ViT patch attention mask
 
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.560856→19.560857 s`** (rel `10799.2684→10799.2691 ms`).
+
 **Meaning:** Build full ViT patch attention mask (`ones` → bool).
 
 **Dataflow (this graph):** `ones` → mask `[1,32,32] bool`
@@ -155,6 +114,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 ---
 
 ## 3. Fused Inductor graph #3 — ViT patch embed
+
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.560903→19.561387 s`** (rel `10799.3152→10799.7996 ms`).
 
 **Meaning:** ViT patch embed (`conv2d` 16×16) + mask-derived position-id bookkeeping.
 
@@ -179,6 +140,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 
 ## 4. Fused Inductor graph #4 — Add learned position embedding to patch tokens
 
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.561394→19.561444 s`** (rel `10799.8060→10799.8568 ms`).
+
 **Meaning:** Add learned position embedding to patch tokens.
 
 **Dataflow (this graph):** `embeddings` + `position_embedding.weight` → `embeddings` `[1,1024,768] bf16`
@@ -195,6 +158,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 ---
 
 ## 5. Fused Inductor graph #5 — ViT encoder stack
+
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.561589→19.562228 s`** (rel `10800.0015→10800.6403 ms`). ViT · L0/12 cam0 (table); full cam0 G5 continues to connector.
 
 **Meaning:** ViT encoder stack (12× LayerNorm / SDPA / MLP) → last_hidden_state.
 
@@ -227,6 +192,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 
 ## 6. Fused Inductor graph #6 — Vision→language connector
 
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.569022→19.569177 s`** (rel `10807.4341→10807.5897 ms`).
+
 **Meaning:** Vision→language connector (spatial pack / PixelShuffle-style reshape + Linear).
 
 **Dataflow (this graph):** `last_hidden_state` → `image_hidden_states` `[1,64,960] bf16`
@@ -244,6 +211,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 
 ## 7. Fused Inductor graph #7 — Language token embedding lookup
 
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.585768→19.585895 s`** (rel `10824.1807→10824.3072 ms`).
+
 **Meaning:** Language token embedding lookup.
 
 **Dataflow (this graph):** `tokens` `[1,48]` + `embed_tokens.weight` → `embedding` `[1,48,960] bf16`
@@ -259,6 +228,8 @@ Ops below are in **Inductor codegen calling order** (`Runner.call` / `partition_
 ---
 
 ## 8. Fused Inductor graph #8 — Prefix + VLM/expert flow-matching
+
+**Timeline (warm chunk #3, `smolvla_nsys_compile.nsys-rep`):** absolute **`19.587961→19.609499 s`** (rel `10826.3734→10847.9115 ms`). Full G8; table is representative L0/euler0 only.
 
 **Meaning:** Prefix + VLM/expert flow-matching (attn / RoPE / Euler) → action chunk.
 

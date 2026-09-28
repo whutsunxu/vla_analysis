@@ -1,5 +1,5 @@
 {
-  "hostname": "5cc711215e18",
+  "hostname": "76c6d6eb5e38",
   "python": "3.12.14",
   "torch": "2.11.0+cu128",
   "cuda_available": true,
@@ -12,7 +12,7 @@
   "model_id": "lerobot/smolvla_base",
   "dataset_id": "lerobot/libero",
   "steps": {
-    "cli_probe_s": 8.34
+    "cli_probe_s": 32.64
   },
   "cuda": {
     "device_name": "NVIDIA GeForce RTX 5060 Ti",
@@ -46,7 +46,7 @@
     "hardware_present": false
   },
   "model": {
-    "load_seconds": 5.99,
+    "load_seconds": 19.31,
     "param_count": 450046176,
     "trainable_param_count": 99880992,
     "parameter_devices": [
@@ -88,7 +88,7 @@
     }
   },
   "processors": {
-    "seconds": 0.61
+    "seconds": 1.46
   },
   "dataset": {
     "ok": false,
@@ -111,9 +111,9 @@
     ]
   },
   "inference": {
-    "seconds": 140.91,
-    "first_select_action_s": 140.838,
-    "second_select_action_s": 0.075,
+    "seconds": 345.36,
+    "first_select_action_s": 344.44,
+    "second_select_action_s": 0.914,
     "batch_source": "fixed_dummy_smolvla_base",
     "smoke_seed": 0,
     "fixed_noise": true,
@@ -124,17 +124,17 @@
       ],
       "dtype": "torch.float32",
       "device": "cpu",
-      "min": -0.39855003356933594,
-      "max": 0.18866842985153198,
-      "mean": -0.09602117538452148,
+      "min": -0.3986027240753174,
+      "max": 0.19044840335845947,
+      "mean": -0.09507129341363907,
       "finite": true,
       "sample": [
-        -0.06473319977521896,
-        -0.030397705733776093,
-        -0.19464652240276337,
-        0.18866842985153198,
-        -0.07646799087524414,
-        -0.39855003356933594
+        -0.06386960297822952,
+        -0.02921145409345627,
+        -0.19250068068504333,
+        0.19044840335845947,
+        -0.07669170945882797,
+        -0.3986027240753174
       ]
     },
     "determinism": {
@@ -148,49 +148,49 @@
       "ok": true,
       "ok_loose": true,
       "skipped": false,
-      "baseline_path": "/workspace/vla_analysis/smoke_test_report_cpu.json",
+      "baseline_path": "/root/workspace/vla_analysis/smoke_test_report.json",
       "baseline_hostname": "575cd14fb466",
       "baseline_device": "cpu",
-      "max_abs_diff": 0.004731431603431702,
-      "mean_abs_diff": 0.0020241353195160627,
+      "max_abs_diff": 0.00450771301984787,
+      "mean_abs_diff": 0.001448738039471209,
       "tol": 0.01,
       "tol_loose": 0.1,
       "per_dim": [
         {
           "dim": 0,
           "cpu": -0.06372098624706268,
-          "got": -0.06473319977521896,
-          "abs_diff": 0.0010122135281562805
+          "got": -0.06386960297822952,
+          "abs_diff": 0.0001486167311668396
         },
         {
           "dim": 1,
           "cpu": -0.029679380357265472,
-          "got": -0.030397705733776093,
-          "abs_diff": 0.0007183253765106201
+          "got": -0.02921145409345627,
+          "abs_diff": 0.0004679262638092041
         },
         {
           "dim": 2,
           "cpu": -0.19337990880012512,
-          "got": -0.19464652240276337,
-          "abs_diff": 0.0012666136026382446
+          "got": -0.19250068068504333,
+          "abs_diff": 0.0008792281150817871
         },
         {
           "dim": 3,
           "cpu": 0.19098371267318726,
-          "got": 0.18866842985153198,
-          "abs_diff": 0.0023152828216552734
+          "got": 0.19044840335845947,
+          "abs_diff": 0.0005353093147277832
         },
         {
           "dim": 4,
           "cpu": -0.08119942247867584,
-          "got": -0.07646799087524414,
-          "abs_diff": 0.004731431603431702
+          "got": -0.07669170945882797,
+          "abs_diff": 0.00450771301984787
         },
         {
           "dim": 5,
           "cpu": -0.39644908905029297,
-          "got": -0.39855003356933594,
-          "abs_diff": 0.0021009445190429688
+          "got": -0.3986027240753174,
+          "abs_diff": 0.002153635025024414
         }
       ]
     },
@@ -201,7 +201,7 @@
         "dtype_ok": true,
         "finite_ok": true,
         "not_all_zero": true,
-        "abs_max": 0.39855003356933594,
+        "abs_max": 0.3986027240753174,
         "abs_max_ok": true,
         "ok": true
       },
@@ -211,24 +211,24 @@
         "dtype_ok": true,
         "finite_ok": true,
         "not_all_zero": true,
-        "abs_max": 0.39855003356933594,
+        "abs_max": 0.3986027240753174,
         "abs_max_ok": true,
         "ok": true
       }
     ]
   },
   "stage_profile": {
-    "stage0_prefix_embed_s": 0.0243,
-    "stage1_suffix_embed_s": 0.0015,
-    "stage2_prefill_s": 0.0075,
-    "stage3_expert_denoise_s": 0.0573,
-    "stage3_euler_update_s": 0.0001,
-    "stage4_crop_queue_postprocess_s": 0.0001,
+    "stage0_prefix_embed_s": 0.045,
+    "stage1_suffix_embed_s": 0.0113,
+    "stage2_prefill_s": 0.0521,
+    "stage3_expert_denoise_s": 0.4898,
+    "stage3_euler_update_s": 0.0011,
+    "stage4_crop_queue_postprocess_s": 0.0003,
     "num_euler_steps": 10,
-    "stage3_expert_plus_euler_s": 0.0574,
-    "stage3_inclusive_with_stage1_s": 0.0589,
-    "stages_0_to_4_sum_s": 0.0908,
-    "wall_clock_total_s": 0.091,
+    "stage3_expert_plus_euler_s": 0.4909,
+    "stage3_inclusive_with_stage1_s": 0.5022,
+    "stages_0_to_4_sum_s": 0.5996,
+    "wall_clock_total_s": 0.6015,
     "action": {
       "shape": [
         1,
@@ -250,13 +250,13 @@
       ]
     },
     "share_pct": {
-      "stage0": 26.74,
-      "stage1": 1.69,
-      "stage2": 8.24,
-      "stage3_expert": 63.27,
-      "stage4": 0.07
+      "stage0": 7.5,
+      "stage1": 1.89,
+      "stage2": 8.69,
+      "stage3_expert": 81.87,
+      "stage4": 0.05
     }
   },
-  "total_seconds": 156.12,
+  "total_seconds": 400.47,
   "status": "PASS"
 }
