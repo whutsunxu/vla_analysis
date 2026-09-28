@@ -1,0 +1,2 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+100.0,1651177,10,165117.7,166120.0,155783,167463,3334.0,triton_poi_fused_native_layer_norm_2
