@@ -28,3 +28,15 @@ Full write-up: [`../ablation_timing_report.md`](../ablation_timing_report.md).
 | full | 34.49 µs | 4.94 µs | 5.03 µs | 1.16 µs |
 | no_scale | 34.48 µs | — | — | 1.15 µs |
 | no_upsample @512² | — | 4.93 µs | 4.92 µs | 1.16 µs |
+
+### Buffer-size sweep (`no_upsample`, masks off)
+
+| File | Target algo IO | Shape |
+|------|---------------:|------|
+| `pre_upsample_no_upsample_io12.nsys-rep` | 12 MB | `[1,3,707,707]` |
+| `pre_upsample_no_upsample_io24.nsys-rep` | 24 MB | `[1,3,1000,1000]` |
+| `pre_upsample_no_upsample_io30.nsys-rep` | 30 MB | `[1,3,1118,1118]` |
+| `pre_upsample_no_upsample_io32.nsys-rep` | 32 MB | `[1,3,1155,1155]` |
+| `pre_upsample_no_upsample_io36.nsys-rep` | 36 MB | `[1,3,1225,1225]` |
+
+See [`../ablation_timing_report.md`](../ablation_timing_report.md) §6 — `mul` BD util falls from ~300% → **98.5%** as algo IO crosses L2 (32 MB).
