@@ -38,5 +38,8 @@ Full write-up: [`../ablation_timing_report.md`](../ablation_timing_report.md).
 | `pre_upsample_no_upsample_io30.nsys-rep` | 30 MB | `[1,3,1118,1118]` |
 | `pre_upsample_no_upsample_io32.nsys-rep` | 32 MB | `[1,3,1155,1155]` |
 | `pre_upsample_no_upsample_io36.nsys-rep` | 36 MB | `[1,3,1225,1225]` |
+| `pre_upsample_no_upsample_io40.nsys-rep` | 40 MB | `[1,3,1291,1291]` |
+| `pre_upsample_no_upsample_io50.nsys-rep` | 50 MB | `[1,3,1443,1443]` |
+| `pre_upsample_no_upsample_io60.nsys-rep` | 60 MB | `[1,3,1581,1581]` |
 
-See [`../ablation_timing_report.md`](../ablation_timing_report.md) §6 — `mul` BD util falls from ~300% → **98.5%** as algo IO crosses L2 (32 MB).
+See [`../ablation_timing_report.md`](../ablation_timing_report.md) §6 — `mul` BD util falls through L2 then **plateaus ~88–95%** at 40–60 MB.

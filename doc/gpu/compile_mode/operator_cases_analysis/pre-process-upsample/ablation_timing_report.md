@@ -169,11 +169,11 @@ IO Volume / GFLOPs / AI / bottleneck labels are **identical** by construction (s
 
 ## 6. Buffer-size sweep (`no_upsample` only) — why BD util drops toward ≤100%
 
-**Goal:** Grow algo IO (`bytes_in + bytes_out` for one `mul`/`add`) through **12 / 24 / 30 / 32 / 36 MB** and watch BD util as the working set approaches **L2 = 32 MB** (RTX 5060 Ti).
+**Goal:** Grow algo IO (`bytes_in + bytes_out` for one `mul`/`add`) through **12 → 60 MB** and watch BD util as the working set crosses **L2 = 32 MB** (RTX 5060 Ti), then check whether util **stabilizes**.
 
 **Setup:** `PROFILE_VARIANT=no_upsample TARGET_IO_MB=<N> INCLUDE_MASKS=0`  
 Shape `[1,3,H,W] f32` with `2·3·H·W·4 ≈ TARGET_IO_MB` decimal MB. Scale only (`×2−1`); no interpolate, no masks. Warmup 5 + 10 CUPTI iters.  
-Artifacts: `nsys/pre_upsample_no_upsample_io{12,24,30,32,36}.nsys-rep`.
+Artifacts: `nsys/pre_upsample_no_upsample_io{12,24,30,32,36,40,50,60}.nsys-rep`.
 
 Baseline row = prior `no_upsample` @512² (algo IO ≈ **6.29 MB**).
 
@@ -187,6 +187,9 @@ Baseline row = prior `no_upsample` @512² (algo IO ≈ **6.29 MB**).
 | **30 MB** | `[1,3,1118,1118]` | 15.00 MB | 30.00 MB | 0.176 ms |
 | **32 MB** | `[1,3,1155,1155]` | 16.01 MB | 32.02 MB | 0.192 ms |
 | **36 MB** | `[1,3,1225,1225]` | 18.01 MB | 36.02 MB | 0.198 ms |
+| **40 MB** | `[1,3,1291,1291]` | 20.00 MB | 40.00 MB | 0.232 ms |
+| **50 MB** | `[1,3,1443,1443]` | 24.99 MB | 49.97 MB | 0.318 ms |
+| **60 MB** | `[1,3,1581,1581]` | 29.99 MB | 59.99 MB | 0.385 ms |
 
 ### 6.2 Roofline vs size (`mul` / `add`; AI = 0.125; all `bd-bounded`)
 
@@ -200,24 +203,38 @@ Same IO model as §2: `IO = 2 · numel · 4`, `FLOPs = numel` (FP32).
 | 30.0 MB | **60.29 µs** | 498 | **111%** ⚠ | 62.2 | **36.37 µs** | 825 | **184%** ⚠ |
 | 32.0 MB | **67.90 µs** | 472 | **105%** ⚠ | 58.9 | **40.74 µs** | 786 | **175%** ⚠ |
 | 36.0 MB | **81.62 µs** | 441 | **98.5%** | 55.2 | **51.88 µs** | 694 | **155%** ⚠ |
+| 40.0 MB | **95.19 µs** | 420 | **93.8%** | 52.6 | **55.87 µs** | 716 | **160%** ⚠ |
+| 50.0 MB | **123.2 µs** | 405 | **90.5%** | 50.7 | **107.9 µs** | 463 | **103%** ⚠ |
+| 60.0 MB | **151.5 µs** | 396 | **88.4%** | 49.5 | **153.8 µs** | 390 | **87.1%** |
 
-### 6.3 Interpretation
+### 6.3 Does BD util stabilize at larger sizes?
 
-1. **Small IO (6–12 MB):** both mul and add show BD util **~285–300%**. Working set ≪ L2 (32 MB) → almost all traffic is on-chip; algo-IO≠DRAM.
-2. **Crossing toward L2 (24→36 MB):** **`mul` BD util falls monotonically** 150% → 111% → 105% → **98.5%**. Once algo IO ≳ L2, the DRAM byte model becomes realistic and util settles near / below 100%.
-3. **`add` stays “faster” / higher util than `mul` at large sizes:** `x*2-1` is two launches — mul writes a temp that often remains **hot in L2** for the following add, so add’s measured time understates DRAM need vs the same algo IO. Mul typically pays the cold read from the input buffer.
-4. **This is direct evidence for the ⚠ tag:** BD util >100% is an artifact of the DRAM byte model on L2-resident working sets, not super-DRAM hardware. Growing the buffer until it stresses L2 removes the paradox for `mul`.
-5. **Pre @512² (6.29 MB IO)** sits deep in the L2-resident regime — same reason Inductor §Pre mul/add report ⚠ ~380% util.
+| Regime | Algo IO | `mul` BD util | Behavior |
+|--------|--------:|--------------:|----------|
+| L2-resident | 6–12 MB | ~285–300% | Algo-IO ≫ DRAM; ⚠ meaningless as DRAM util |
+| Crossing L2 | 24–36 MB | 150% → **98.5%** | Steep drop as working set spills |
+| Post-L2 | 40–60 MB | **93.8% → 90.5% → 88.4%** | **Slow settle**, not a hard floor yet |
+
+**Verdict:** After crossing L2, `mul` BD util **does not jump around** — it **gently asymptotes** in the **~85–95%** band (40→60 MB: only −5.4 pp). That is the realistic DRAM-bound plateau for this elementwise (algo IO ≈ actual traffic; remaining gap to 100% is write-allocate / cache policy / less-than-peak clocks). Extending further would likely stay in that band, not climb back above 100%.
+
+**`add` catches up:** at 24–40 MB, add is still L2-helped (util 155–270%, mul/add time ratio ~1.6–1.8). By **60 MB**, mul≈add (~152 µs) and both util ~**88%** — producer→consumer L2 reuse is exhausted when buffers are large enough that temp + out no longer fit hot together.
 
 ```text
-BD util(mul) vs algo IO (sketch)
+BD util(mul) vs algo IO
 
   300% | **  **
        |          *
   150% |                *
-  100% |                    *  *   ← ~L2 (32 MB)
-       +----12---24---30--32--36  MB algo IO
+  100% |                    *  *  *──*──*   ← plateau ~88–95%
+       +----12---24---30--36-40-50-60  MB
+                         ↑ L2=32MB
 ```
+
+### 6.4 Interpretation (short)
+
+1. **⚠ util >100%** only in the L2-resident regime (Pre @512² lives here).
+2. Past L2, util **stabilizes below 100%** (~88–95% for `mul` at 40–60 MB).
+3. Pre-scale absolute times remain valid; the size sweep only clarifies the BD-util metric.
 
 ---
 
@@ -240,7 +257,7 @@ for v in full no_scale no_upsample; do
 done
 
 # Buffer-size sweep (no_upsample, masks off)
-for mb in 12 24 30 32 36; do
+for mb in 12 24 30 32 36 40 50 60; do
   nsys profile --force-overwrite=true \
     --trace=cuda,nvtx,osrt --cuda-event-trace=false \
     --capture-range=cudaProfilerApi --capture-range-end=stop \
