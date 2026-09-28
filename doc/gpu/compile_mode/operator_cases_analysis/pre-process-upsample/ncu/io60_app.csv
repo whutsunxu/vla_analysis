@@ -1,0 +1,32 @@
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 716.9009 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=716.9009 ms  median=716.9009 ms  min=716.9009 max=716.9009
+live out_ptr=131887204925440
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 367.6990 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=367.6990 ms  median=367.6990 ms  min=367.6990 max=367.6990
+live out_ptr=129136815243264
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 303.7973 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=303.7973 ms  median=303.7973 ms  min=303.7973 max=303.7973
+live out_ptr=131854925561856
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 313.0297 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=313.0297 ms  median=313.0297 ms  min=313.0297 max=313.0297
+live out_ptr=130089492676608
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 305.4472 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=305.4472 ms  median=305.4472 ms  min=305.4472 max=305.4472
+live out_ptr=132532859305984
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 301.2306 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=301.2306 ms  median=301.2306 ms  min=301.2306 max=301.2306
+live out_ptr=132108664176640
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 305.1420 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=305.1420 ms  median=305.1420 ms  min=305.1420 max=305.1420
+live out_ptr=132330224091136
+variant=no_upsample device=cuda warmup=5 iters=1 in=(1, 3, 1581, 1581) include_masks=False target_io_mb=60.0 buf_mb=29.995 algo_io_mb=59.989
+  iter 00: 304.9587 ms  out=(1, 3, 1581, 1581)
+summary variant=no_upsample mean=304.9587 ms  median=304.9587 ms  min=304.9587 max=304.9587
+live out_ptr=135506520178688

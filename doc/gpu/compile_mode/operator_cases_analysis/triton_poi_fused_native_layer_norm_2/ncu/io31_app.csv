@@ -1,0 +1,32 @@
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 556.5155 ms  out=(1, 10048, 768)
+summary label=io31 mean=556.5155 ms  median=556.5155 ms  min=556.5155 max=556.5155
+live out_ptr=124465904091136
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 291.8201 ms  out=(1, 10048, 768)
+summary label=io31 mean=291.8201 ms  median=291.8201 ms  min=291.8201 max=291.8201
+live out_ptr=134197897330688
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 291.8724 ms  out=(1, 10048, 768)
+summary label=io31 mean=291.8724 ms  median=291.8724 ms  min=291.8724 max=291.8724
+live out_ptr=130886880198656
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 286.3303 ms  out=(1, 10048, 768)
+summary label=io31 mean=286.3303 ms  median=286.3303 ms  min=286.3303 max=286.3303
+live out_ptr=134879522062336
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 278.6330 ms  out=(1, 10048, 768)
+summary label=io31 mean=278.6330 ms  median=278.6330 ms  min=278.6330 max=278.6330
+live out_ptr=135910918193152
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 291.6547 ms  out=(1, 10048, 768)
+summary label=io31 mean=291.6547 ms  median=291.6547 ms  min=291.6547 max=291.6547
+live out_ptr=136256595951616
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 277.9317 ms  out=(1, 10048, 768)
+summary label=io31 mean=277.9317 ms  median=277.9317 ms  min=277.9317 max=277.9317
+live out_ptr=128520420327424
+label=io31 device=cuda warmup=5 iters=1 Y=10048 X=768 grid=(12, 157) XBLOCK=64 YBLOCK=64 algo_io_mb=30.951 buf_x_mb=15.434
+  iter 00: 282.0541 ms  out=(1, 10048, 768)
+summary label=io31 mean=282.0541 ms  median=282.0541 ms  min=282.0541 max=282.0541
+live out_ptr=125455558508544

@@ -6,7 +6,8 @@
 **Harness:** `profile_ln_poi.py` + `ln_poi_kernel.py`  
 **Protocol:** warmup **5** (outside CUPTI) + measured **10** sync’d iters (inside `cudaProfilerApi`)
 
-Artifacts: `nsys/ln_poi_{baseline,io8,io16,io24,io29…io35,io48,io64,io96,io128}.nsys-rep` + `*_cuda_gpu_kern_sum.csv`.
+Artifacts: `nsys/ln_poi_{baseline,io8,io16,io24,io29…io35,io48,io64,io96,io128}.nsys-rep` + `*_cuda_gpu_kern_sum.csv`.  
+ncu (§7): `ncu/io{24,31,32,33,34,35,48,64}_ncu.log` + `io*_app.csv` (`ncu` 2026.3.1).
 
 Roofline / IO rules match `SmolVLA_op_list_inductor_nsight.md` §GRAPH5 and `smolvla_compile_fused_table_metrics.py`:  
 poi LN **FLOPs = 7·N**; **IO = Σ bytes(inputs)+Σ bytes(output)**; BD util ⚠ when algo-IO ≫ DRAM (L2/cache).
@@ -243,59 +244,76 @@ At target 32 MB: `x` ≈ `out` ≈ **15.93 MB** → together ≈ **L2**. Beyond 
 
 ---
 
-## 7. Can Nsight Compute (`.ncu-rep`) confirm the L2 story?
+## 7. Nsight Compute confirmation (L2 hit vs DRAM)
 
-**In principle: yes.** Memory Workload Analysis on this kernel at two sizes (e.g. **24 MB** vs **64 MB**) should show:
+**Yes.** `ncu` **2026.3.1** profiles this GB206 (RTX 5060 Ti). `ncu` 2025.1.1 did not (`LibraryNotLoaded`; `--list-chips` had no `gb206`).
 
-| Signal (typical metric / UI) | L2-hot (~24–31 MB) | Post-L2 (~64–128 MB) |
-|------------------------------|--------------------|----------------------|
-| **L2 hit rate** (`lts__t_sector_hit_rate.pct` or Memory Chart “L2 Hit Rate”) | **high** (often ≫50–80%) | **low** (miss-dominated) |
-| **DRAM bytes** (`dram__bytes_read/write.sum`) | **≪ algo IO** (traffic served from L2) | **≈ algo IO** (plus write-allocate) |
-| **Achieved DRAM BW** | low vs peak | approaches ~85% of 448 GB/s (matches §6 plateau) |
-| **L1/TEX → L2 sectors** hit vs miss | hit-heavy | miss-heavy |
+**Protocol:** application replay, `--cache-control none`, `--clock-control none`, `--profile-from-start off`. Warmup **5** is outside `cudaProfilerStart`; **1** measured launch inside the range. Kernel `triton_poi_fused_native_layer_norm_2`. Unit test on this host: max abs **7.8e−3**, **PASS**.
 
-That is exactly how you “see” why algo-IO BD util can exceed 100% in nsys: **algo IO counts every load/store; DRAM counters only count what missed L2**.
+Artifacts: `ncu/io{24,31,32,33,34,35,48,64}_ncu.log` + matching `io*_app.csv`.
 
-**On this host (2026-09-28): not yet runnable.**
+ncu times are one warmed launch under unlocked clocks, so they are not the §6 CUPTI averages. Hit rate and DRAM bytes are the L2 evidence.
 
-| Tool | Result on RTX 5060 Ti (Blackwell **GB206**) |
-|------|-----------------------------------------------|
-| Nsight Compute **2025.1.1** | `Failed to initialize the profiler: LibraryNotLoaded` |
-| `ncu --list-chips` | has `gb202/gb203/gb205`, **no `gb206`** |
-| nsys `--gpu-metrics-devices` | `None of the installed GPUs are supported: Blackwell GB206` |
+### 7.1 Counters
 
-So we **cannot** produce a `.ncu-rep` L2 hit-rate table here until a newer Nsight Compute that lists **GB206** is installed. Until then, the nsys size-sweep discontinuity (§6.5) is the evidence.
+`x`+`out` = 2 × bf16 activation. **DRAM read / x** = `dram__bytes_op_read` / bytes(`x`). **Read / write hit** = L2 sector lookup hits from L1TEX (`lts__t_sectors_srcunit_tex_op_{read,write}_lookup_hit` / `_sum`). **L2 hit** = `lts__t_sector_hit_rate.pct`. **DRAM SOL** = `gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed`. **SM SOL** = `sm__throughput.avg.pct_of_peak_sustained_elapsed`.
 
-### Recipe once GB206-capable `ncu` is available
+| Algo IO | `x` buffer | `x`+`out` | Time | DRAM read | DRAM write | DRAM read / `x` | L2 hit | Read hit | Write hit | DRAM SOL | SM SOL |
+|--------:|-----------:|----------:|-----:|----------:|-----------:|----------------:|-------:|---------:|----------:|---------:|-------:|
+| 24.05 MB | 11.99 MB | 24.0 MB | **18.0 µs** | 0.00 MB | 3.57 MB | **0%** | **100%** | **100%** | 100% | 45% | 61% |
+| 30.95 MB | 15.43 MB | 30.9 MB | **31.5 µs** | 2.50 MB | 7.65 MB | 16% | 86% | 84% | 88% | 73% | 44% |
+| 31.94 MB | 15.93 MB | 31.9 MB | **40.4 µs** | 5.35 MB | 8.64 MB | 34% | 75% | **69%** | 81% | 79% | 35% |
+| 32.92 MB | 16.42 MB | 32.8 MB | **49.0 µs** | 9.61 MB | 8.23 MB | 59% | 54% | 47% | 63% | 83% | 30% |
+| 33.91 MB | 16.91 MB | 33.8 MB | **60.5 µs** | 14.0 MB | 8.36 MB | 83% | 37% | 25% | 49% | 84% | 25% |
+| 35.09 MB | 17.50 MB | 35.0 MB | **67.8 µs** | 16.6 MB | 8.96 MB | **95%** | 29% | **13%** | 47% | 85% | 24% |
+| 47.90 MB | 23.89 MB | 47.8 MB | **100 µs** | 24.0 MB | 13.9 MB | 101% | 11% | 6.7% | 15% | **86%** | 21% |
+| 64.07 MB | 31.95 MB | 63.9 MB | **149 µs** | 32.1 MB | 24.1 MB | 101% | 3.5% | 6.7% | **0%** | **86%** | 19% |
+
+L1 global-load bytes stay ~**1.6×** the `x` buffer at every size. L2 read-sector bytes stay within ~**8%** of the real tensor, so that extra is intra-tile reuse of the same L2 sectors, not extra DRAM.
+
+### 7.2 What this confirms in §6
+
+| Regime | ncu | Matches §6 |
+|--------|-----|------------|
+| L2-resident (24 MB) | DRAM read **0**; L2 hit **100%**. The 3.57 MB DRAM write is dirty output flushed during the launch. | ⚠ BD util **>100%**: algo IO counts loads/stores L2 never sent to DRAM. |
+| Onset (31→35 MB) | Read hit **84% → 13%**. DRAM read goes from **2.5 MB** to **16.6 / 17.5 MB** of `x`. | Soft break at ~32 MB, then a ramp, not one step. `x`+`out` ≈ L2 at the 32 MB target (each buffer ≈ 15.9 MB). |
+| Post-L2 (48–64 MB) | DRAM read ≈ all of `x`. At 64 MB, DRAM write is **24.1 / 32.0 MB** and write hit is **0**. DRAM SOL **86%**. | Plateau ~**85%** of 448 GB/s. SM SOL falls **61% → 19%** as the kernel waits on DRAM. |
+
+Writes lag reads through the zoom: DRAM write stays ~**8–9 MB** from 31 MB to 35 MB while DRAM read climbs **2.5 → 16.6 MB**. Stores allocate in L2 and many lines are still dirty at kernel exit. Algo IO grows **2.7×** from 24→64 MB; ncu time grows **8.3×**.
+
+### 7.3 Reproduce
 
 ```bash
 cd doc/gpu/compile_mode/operator_cases_analysis/triton_poi_fused_native_layer_norm_2
 source /venv/main/bin/activate
 mkdir -p ncu
+export PATH="/usr/local/bin:/usr/local/cuda/bin:$PATH"
 
-# Contrast L2-hot vs post-L2 (skip 5 warmup launches, capture 3)
-for mb in 24 32 64; do
-  ncu --force-overwrite \
-    --target-processes all \
-    --kernel-name-base demangled \
-    --kernel-name regex:triton_poi_fused_native_layer_norm_2 \
-    --launch-skip 5 --launch-count 3 \
-    --section MemoryWorkloadAnalysis \
-    --section MemoryWorkloadAnalysis_Tables \
-    --section SpeedOfLight \
-    --export ncu/ln_poi_io${mb} \
-    env SMOKE_DEVICE=cuda N_WARMUP=5 N_ITERS=8 CUPTI_RANGE=0 TARGET_IO_MB=$mb \
-    python profile_ln_poi.py
+METRICS="gpu__time_duration.avg,dram__bytes_op_read.sum,dram__bytes_op_write.sum,lts__t_bytes.sum,\
+lts__t_sectors_srcunit_tex_op_read.sum,lts__t_sectors_srcunit_tex_op_read_lookup_hit.sum,\
+lts__t_sectors_srcunit_tex_op_read_lookup_miss.sum,lts__t_sectors_srcunit_tex_op_write.sum,\
+lts__t_sectors_srcunit_tex_op_write_lookup_hit.sum,lts__t_sectors_srcunit_tex_op_write_lookup_miss.sum,\
+lts__t_sector_hit_rate.pct,l1tex__t_bytes_pipe_lsu_mem_global_op_ld.sum,\
+l1tex__t_bytes_pipe_lsu_mem_global_op_st.sum,\
+gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed,\
+lts__throughput.avg.pct_of_peak_sustained_elapsed,\
+sm__throughput.avg.pct_of_peak_sustained_elapsed"
+
+for mb in 24 31 32 33 34 35 48 64; do
+  ncu --target-processes all \
+    --profile-from-start off \
+    --cache-control none \
+    --clock-control none \
+    --replay-mode application \
+    --kernel-name regex:triton_poi_fused_native_layer_norm \
+    --launch-count 1 \
+    --metrics "$METRICS" \
+    --csv \
+    --log-file "ncu/io${mb}_ncu.log" \
+    env SMOKE_DEVICE=cuda N_WARMUP=5 N_ITERS=1 CUPTI_RANGE=1 TARGET_IO_MB=$mb \
+    python profile_ln_poi.py > "ncu/io${mb}_app.csv"
 done
-
-# Compare key metrics (names may vary slightly by ncu version)
-ncu --import ncu/ln_poi_io24.ncu-rep --page raw | grep -iE 'lts__t_sector_hit|dram__bytes|l2'
-ncu --import ncu/ln_poi_io64.ncu-rep --page raw | grep -iE 'lts__t_sector_hit|dram__bytes|l2'
 ```
-
-Expected confirmation: **hit rate high + DRAM bytes ≪ algo IO** at 24 MB; **hit rate down + DRAM bytes ≈ algo IO** at 64 MB.
-
-Or use the helper: `bash profile_ln_poi_ncu.sh` (same sizes).
 
 ---
 
