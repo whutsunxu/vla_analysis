@@ -256,18 +256,20 @@ ncu times are one warmed launch under unlocked clocks, so they are not the §6 C
 
 ### 7.1 Counters
 
-`x`+`out` = 2 × bf16 activation. **DRAM read / x** = `dram__bytes_op_read` / bytes(`x`). **Read / write hit** = L2 sector lookup hits from L1TEX (`lts__t_sectors_srcunit_tex_op_{read,write}_lookup_hit` / `_sum`). **L2 hit** = `lts__t_sector_hit_rate.pct`. **DRAM SOL** = `gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed`. **SM SOL** = `sm__throughput.avg.pct_of_peak_sustained_elapsed`.
+`x`+`out` = 2 × bf16 activation. **DRAM read / x** = `dram__bytes_op_read` / bytes(`x`). **Read / write hit** = L2 sector lookup hits from L1TEX (`lts__t_sectors_srcunit_tex_op_{read,write}_lookup_hit` / `_sum`). **L2 hit** = `lts__t_sector_hit_rate.pct`. **DRAM memory throughput** is the NCU Speed-of-Light **Memory Throughput** row: `gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed` against the **448 GB/s** DRAM peak, with GB/s = (DRAM read + DRAM write) / kernel time. That column is DRAM, not L2.
 
-| Algo IO | `x` buffer | `x`+`out` | Time | DRAM read | DRAM write | DRAM read / `x` | L2 hit | Read hit | Write hit | DRAM SOL | SM SOL |
-|--------:|-----------:|----------:|-----:|----------:|-----------:|----------------:|-------:|---------:|----------:|---------:|-------:|
-| 24.05 MB | 11.99 MB | 24.0 MB | **18.0 µs** | 0.00 MB | 3.57 MB | **0%** | **100%** | **100%** | 100% | 45% | 61% |
-| 30.95 MB | 15.43 MB | 30.9 MB | **31.5 µs** | 2.50 MB | 7.65 MB | 16% | 86% | 84% | 88% | 73% | 44% |
-| 31.94 MB | 15.93 MB | 31.9 MB | **40.4 µs** | 5.35 MB | 8.64 MB | 34% | 75% | **69%** | 81% | 79% | 35% |
-| 32.92 MB | 16.42 MB | 32.8 MB | **49.0 µs** | 9.61 MB | 8.23 MB | 59% | 54% | 47% | 63% | 83% | 30% |
-| 33.91 MB | 16.91 MB | 33.8 MB | **60.5 µs** | 14.0 MB | 8.36 MB | 83% | 37% | 25% | 49% | 84% | 25% |
-| 35.09 MB | 17.50 MB | 35.0 MB | **67.8 µs** | 16.6 MB | 8.96 MB | **95%** | 29% | **13%** | 47% | 85% | 24% |
-| 47.90 MB | 23.89 MB | 47.8 MB | **100 µs** | 24.0 MB | 13.9 MB | 101% | 11% | 6.7% | 15% | **86%** | 21% |
-| 64.07 MB | 31.95 MB | 63.9 MB | **149 µs** | 32.1 MB | 24.1 MB | 101% | 3.5% | 6.7% | **0%** | **86%** | 19% |
+| Algo IO | `x` buffer | `x`+`out` | Time | DRAM read | DRAM write | DRAM read / `x` | L2 hit | Read hit | Write hit | DRAM memory throughput |
+|--------:|-----------:|----------:|-----:|----------:|-----------:|----------------:|-------:|---------:|----------:|-----------------------:|
+| 24.05 MB | 11.99 MB | 24.0 MB | **18.0 µs** | 0.00 MB | 3.57 MB | **0%** | **100%** | **100%** | 100% | **198 GB/s · 45%** |
+| 30.95 MB | 15.43 MB | 30.9 MB | **31.5 µs** | 2.50 MB | 7.65 MB | 16% | 86% | 84% | 88% | 322 GB/s · 73% |
+| 31.94 MB | 15.93 MB | 31.9 MB | **40.4 µs** | 5.35 MB | 8.64 MB | 34% | 75% | **69%** | 81% | 346 GB/s · 79% |
+| 32.92 MB | 16.42 MB | 32.8 MB | **49.0 µs** | 9.61 MB | 8.23 MB | 59% | 54% | 47% | 63% | 364 GB/s · 83% |
+| 33.91 MB | 16.91 MB | 33.8 MB | **60.5 µs** | 14.0 MB | 8.36 MB | 83% | 37% | 25% | 49% | 370 GB/s · 84% |
+| 35.09 MB | 17.50 MB | 35.0 MB | **67.8 µs** | 16.6 MB | 8.96 MB | **95%** | 29% | **13%** | 47% | 377 GB/s · 85% |
+| 47.90 MB | 23.89 MB | 47.8 MB | **100 µs** | 24.0 MB | 13.9 MB | 101% | 11% | 6.7% | 15% | **379 GB/s · 86%** |
+| 64.07 MB | 31.95 MB | 63.9 MB | **149 µs** | 32.1 MB | 24.1 MB | 101% | 3.5% | 6.7% | **0%** | **377 GB/s · 86%** |
+
+24 MB has the highest L2 hit and the **lowest** DRAM throughput: loads never reach DRAM, and the 3.57 MB write-back is only ~198 GB/s (45% of 448). From 35 MB on, DRAM throughput sits at ~377 GB/s (85–86% of peak).
 
 L1 global-load bytes stay ~**1.6×** the `x` buffer at every size. L2 read-sector bytes stay within ~**8%** of the real tensor, so that extra is intra-tile reuse of the same L2 sectors, not extra DRAM.
 
@@ -277,7 +279,7 @@ L1 global-load bytes stay ~**1.6×** the `x` buffer at every size. L2 read-secto
 |--------|-----|------------|
 | L2-resident (24 MB) | DRAM read **0**; L2 hit **100%**. The 3.57 MB DRAM write is dirty output flushed during the launch. | ⚠ BD util **>100%**: algo IO counts loads/stores L2 never sent to DRAM. |
 | Onset (31→35 MB) | Read hit **84% → 13%**. DRAM read goes from **2.5 MB** to **16.6 / 17.5 MB** of `x`. | Soft break at ~32 MB, then a ramp, not one step. `x`+`out` ≈ L2 at the 32 MB target (each buffer ≈ 15.9 MB). |
-| Post-L2 (48–64 MB) | DRAM read ≈ all of `x`. At 64 MB, DRAM write is **24.1 / 32.0 MB** and write hit is **0**. DRAM SOL **86%**. | Plateau ~**85%** of 448 GB/s. SM SOL falls **61% → 19%** as the kernel waits on DRAM. |
+| Post-L2 (48–64 MB) | DRAM read ≈ all of `x`. At 64 MB, DRAM write is **24.1 / 32.0 MB** and write hit is **0**. DRAM memory throughput **377 GB/s (86%)**. | Plateau ~**85%** of 448 GB/s. |
 
 Writes lag reads through the zoom: DRAM write stays ~**8–9 MB** from 31 MB to 35 MB while DRAM read climbs **2.5 → 16.6 MB**. Stores allocate in L2 and many lines are still dirty at kernel exit. Algo IO grows **2.7×** from 24→64 MB; ncu time grows **8.3×**.
 

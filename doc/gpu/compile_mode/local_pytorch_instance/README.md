@@ -23,20 +23,19 @@ Smoke baseline: [`../smolVLA_compile_mode_smoke_test_report.md`](../smolVLA_comp
 | GPU arch | `TORCH_CUDA_ARCH_LIST=12.0` (RTX 5060 Ti / SM120) |
 | Python | 3.12.14 |
 
-## Time & disk estimate (before build)
+## Time & disk (actual on this host)
 
-| Phase | Expected wall time (32 vCPU) | Disk |
-|-------|------------------------------:|------|
-| Clone (+ needed submodules) | **5–20 min** | ~1.5–3 GB |
-| CMake configure | **2–5 min** | — |
-| Compile + link CUDA `libtorch` | **1.5–3 h** (often ~90–150 min for single-arch Release) | **peak ~25–45 GB** typical |
-| Editable install into venv | **1–5 min** | +~1–2 GB |
-| Smoke re-verify (`reduce-overhead`) | **~2–3 min** warm path; cold first compile **~1.5–2 min+** (was ~98 s on wheel) | — |
+| Phase | Actual |
+|-------|--------|
+| Clone + deps | ~minutes |
+| Compile + editable install | **~2 h** (`ninja -j 6`, 2317 steps) |
+| Peak free disk remaining | **~17 GB** of 32 GB overlay (survived) |
+| Smoke re-verify cold `select_action` | **245.8 s** |
+| Smoke re-verify warm | **0.86 s** · **PASS** vs CPU max abs **4.71e-3** |
 
-**Bottom line:** plan on about **2–3.5 hours** end-to-end for a minimized CUDA build.  
-**Risk on this Vast container:** root overlay is only **~32 GB** (~19 GB free after cache clean) — a full CUDA build can **OOM the disk**. Build uses aggressive feature cuts; if disk fills, fall back to the Python-overlay mode in `NOTES.md` (still enough for Dynamo/Inductor logic).
+See [`STATUS.md`](STATUS.md) and [`smoke_reverify.md`](smoke_reverify.md).
 
-## Build flags (minimized)
+## Build flags (used)
 
 ```text
 USE_CUDA=1
@@ -53,10 +52,12 @@ USE_MKLDNN=0
 USE_QNNPACK=0
 USE_PYTORCH_QNNPACK=0
 USE_XNNPACK=0
-MAX_JOBS=8          # lower peak /tmp object pressure
+USE_FLASH_ATTENTION=0
+USE_MEM_EFF_ATTENTION=0
+MAX_JOBS=6
 CMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
 ```
 
 ## Status
 
-See [`STATUS.md`](STATUS.md) for live progress, [`NOTES.md`](NOTES.md) for commands/logs, [`smoke_reverify.md`](smoke_reverify.md) after install.
+**Complete.** Editable torch is live in `/venv/main`. Details: [`STATUS.md`](STATUS.md), smoke: [`smoke_reverify.md`](smoke_reverify.md).

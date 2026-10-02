@@ -1,0 +1,262 @@
+{
+  "hostname": "76c6d6eb5e38",
+  "python": "3.12.14",
+  "torch": "2.11.0a0+git70d99e9",
+  "cuda_available": true,
+  "smoke_device_req": "cuda",
+  "device_forced": "cuda",
+  "compile": {
+    "enabled": true,
+    "mode": "reduce-overhead"
+  },
+  "model_id": "lerobot/smolvla_base",
+  "dataset_id": "lerobot/libero",
+  "steps": {
+    "cli_probe_s": 33.5
+  },
+  "cuda": {
+    "device_name": "NVIDIA GeForce RTX 5060 Ti",
+    "device_capability": [
+      12,
+      0
+    ],
+    "driver_cuda_version": "12.8",
+    "memory_gb": 16.62
+  },
+  "real_world_cli": {
+    "lerobot_record_help": {
+      "returncode": 0,
+      "has_so100": true,
+      "has_policy_path_or_type": false,
+      "first_line": "usage: lerobot-record [-h] [--config_path str] [--robot str]"
+    },
+    "lerobot_rollout_help": {
+      "returncode": 0,
+      "has_so100": true,
+      "has_policy_path_or_type": true,
+      "first_line": "usage: lerobot-rollout [-h] [--config_path str] [--robot str]"
+    },
+    "serial_ports": [],
+    "video_devices": [],
+    "record_dry_run": {
+      "returncode": 1,
+      "timed_out": false,
+      "output_tail": "e \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 220, in parse\n    return parser.parse_args(args)\n           ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 108, in parse_args\n    args, _ = self.parse_known_args(args, namespace, is_parse_args=True)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 145, in parse_known_args\n    parsed_t = self._postprocessing(parsed_args)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/argparsing.py\", line 189, in _postprocessing\n    cfg = decoding.decode(self.config_class, deflat_d)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/parsers/registry_utils.py\", line 81, in wrapper\n    return base_func(*args, **kw)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/parsers/decoding.py\", line 66, in decode\n    return get_decoding_fn(cls)(raw_value, ())  # type: ignore\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/main/lib/python3.12/site-packages/draccus/parsers/decoding.py\", line 179, in decode_dataclass\n    raise ParsingError(f\"Couldn't instantiate class {stringify_type(cls)} using the given arguments.\") from e\ndraccus.utils.ParsingError: Couldn't instantiate class RecordConfig using the given arguments."
+    },
+    "hardware_present": false
+  },
+  "model": {
+    "load_seconds": 38.72,
+    "param_count": 450046176,
+    "trainable_param_count": 99880992,
+    "parameter_devices": [
+      "cuda:0"
+    ],
+    "parameter_dtypes": [
+      "torch.bfloat16",
+      "torch.float32"
+    ],
+    "chunk_size": 50,
+    "n_action_steps": 50,
+    "num_steps": 10,
+    "compile_model": true,
+    "compile_mode": "reduce-overhead",
+    "input_features": {
+      "observation.state": [
+        6
+      ],
+      "observation.images.camera1": [
+        3,
+        256,
+        256
+      ],
+      "observation.images.camera2": [
+        3,
+        256,
+        256
+      ],
+      "observation.images.camera3": [
+        3,
+        256,
+        256
+      ]
+    },
+    "output_features": {
+      "action": [
+        6
+      ]
+    }
+  },
+  "processors": {
+    "seconds": 3.1
+  },
+  "dataset": {
+    "ok": false,
+    "skipped": true,
+    "reason": "using fixed deterministic dummy observation (SMOKE_SEED); libero not required",
+    "smoke_seed": 0,
+    "task": "Put lego brick into the transparent box",
+    "state": [
+      0.0,
+      0.10000000149011612,
+      -0.10000000149011612,
+      0.20000000298023224,
+      -0.20000000298023224,
+      0.0
+    ],
+    "image_keys": [
+      "observation.images.camera1",
+      "observation.images.camera2",
+      "observation.images.camera3"
+    ]
+  },
+  "inference": {
+    "seconds": 246.65,
+    "first_select_action_s": 245.785,
+    "second_select_action_s": 0.862,
+    "batch_source": "fixed_dummy_smolvla_base",
+    "smoke_seed": 0,
+    "fixed_noise": true,
+    "action": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "torch.float32",
+      "device": "cpu",
+      "min": -0.3986189365386963,
+      "max": 0.19028736650943756,
+      "mean": -0.09567927569150925,
+      "finite": true,
+      "sample": [
+        -0.0670723021030426,
+        -0.028973840177059174,
+        -0.19320721924304962,
+        0.19028736650943756,
+        -0.07649076730012894,
+        -0.3986189365386963
+      ]
+    },
+    "determinism": {
+      "runs": 2,
+      "identical": true,
+      "max_abs_diff": 0.0,
+      "tol": 0.001,
+      "ok": true
+    },
+    "cpu_compare": {
+      "ok": true,
+      "ok_loose": true,
+      "skipped": false,
+      "baseline_path": "/root/workspace/vla_analysis/smoke_test_report.json",
+      "baseline_hostname": "575cd14fb466",
+      "baseline_device": "cpu",
+      "max_abs_diff": 0.0047086551785469055,
+      "mean_abs_diff": 0.001967399148270488,
+      "tol": 0.01,
+      "tol_loose": 0.1,
+      "per_dim": [
+        {
+          "dim": 0,
+          "cpu": -0.06372098624706268,
+          "got": -0.0670723021030426,
+          "abs_diff": 0.0033513158559799194
+        },
+        {
+          "dim": 1,
+          "cpu": -0.029679380357265472,
+          "got": -0.028973840177059174,
+          "abs_diff": 0.0007055401802062988
+        },
+        {
+          "dim": 2,
+          "cpu": -0.19337990880012512,
+          "got": -0.19320721924304962,
+          "abs_diff": 0.0001726895570755005
+        },
+        {
+          "dim": 3,
+          "cpu": 0.19098371267318726,
+          "got": 0.19028736650943756,
+          "abs_diff": 0.0006963461637496948
+        },
+        {
+          "dim": 4,
+          "cpu": -0.08119942247867584,
+          "got": -0.07649076730012894,
+          "abs_diff": 0.0047086551785469055
+        },
+        {
+          "dim": 5,
+          "cpu": -0.39644908905029297,
+          "got": -0.3986189365386963,
+          "abs_diff": 0.0021698474884033203
+        }
+      ]
+    },
+    "reasonableness": [
+      {
+        "label": "run1",
+        "shape_ok": true,
+        "dtype_ok": true,
+        "finite_ok": true,
+        "not_all_zero": true,
+        "abs_max": 0.3986189365386963,
+        "abs_max_ok": true,
+        "ok": true
+      },
+      {
+        "label": "run2",
+        "shape_ok": true,
+        "dtype_ok": true,
+        "finite_ok": true,
+        "not_all_zero": true,
+        "abs_max": 0.3986189365386963,
+        "abs_max_ok": true,
+        "ok": true
+      }
+    ]
+  },
+  "stage_profile": {
+    "stage0_prefix_embed_s": 0.0785,
+    "stage1_suffix_embed_s": 0.0092,
+    "stage2_prefill_s": 0.0434,
+    "stage3_expert_denoise_s": 0.3999,
+    "stage3_euler_update_s": 0.0009,
+    "stage4_crop_queue_postprocess_s": 0.0003,
+    "num_euler_steps": 10,
+    "stage3_expert_plus_euler_s": 0.4009,
+    "stage3_inclusive_with_stage1_s": 0.41,
+    "stages_0_to_4_sum_s": 0.5322,
+    "wall_clock_total_s": 0.5338,
+    "action": {
+      "shape": [
+        1,
+        6
+      ],
+      "dtype": "torch.float32",
+      "device": "cpu",
+      "min": -0.39494311809539795,
+      "max": 0.19233250617980957,
+      "mean": -0.09492239356040955,
+      "finite": true,
+      "sample": [
+        -0.06147128343582153,
+        -0.029477760195732117,
+        -0.19249217212200165,
+        0.19233250617980957,
+        -0.08348248898983002,
+        -0.39494311809539795
+      ]
+    },
+    "share_pct": {
+      "stage0": 14.75,
+      "stage1": 1.73,
+      "stage2": 8.15,
+      "stage3_expert": 75.32,
+      "stage4": 0.05
+    }
+  },
+  "total_seconds": 323.49,
+  "status": "PASS"
+}
